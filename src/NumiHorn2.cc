@@ -71,9 +71,6 @@ void NumiDetectorConstruction::ConstructHorn2(G4ThreeVector hornpos, G4RotationM
   MVzPos.push_back(Horn2Z0-MVgap); MVRin.push_back(PHorn2ICRin(MVzPos[0])-MVgap); MVRout.push_back(PHorn2OCRout(MVzPos[0])+MVgap);
 
   G4UserLimits *MyLimits = new G4UserLimits();
-  if(ND->raytracing){
-    MyLimits->SetMaxAllowedStep(1*CLHEP::cm);
-  }
   //
   // Imperfect Current equalizer section support. 
   // To generate the RZ map, one needs a the accurate position of the IC, + thickness. 
@@ -241,9 +238,6 @@ void NumiDetectorConstruction::ConstructHorn2(G4ThreeVector hornpos, G4RotationM
   G4LogicalVolume *lvMHorn2 = new G4LogicalVolume(sMHorn2,material,"lvMHorn2",0,0,0);
   G4VisAttributes* invisible=new G4VisAttributes(false);
   lvMHorn2->SetVisAttributes(invisible);
-  if(ND->raytracing){
-    lvMHorn2->SetUserLimits(MyLimits);
-  }
   rotation=hornrot;
   translation=hornpos-TargetHallPosition;
   std::cerr << " NumiDetectorConstruction::ConstructHorn2, hornPos " << hornpos << " trans " 

@@ -136,6 +136,7 @@ NumiAnalysis::NumiAnalysis()
   code[3222]  = 21;
   code[3212]  = 22;
   code[3112]  = 20;
+  mesontree = 0;
 }
 //------------------------------------------------------------------------------------
 NumiAnalysis::~NumiAnalysis()
@@ -333,6 +334,21 @@ void NumiAnalysis::book()
       zpNtuple->cd();
       zptree = new TTree("zp","g4numi Tracking particles through ZPoints");
       zptree->Branch("zpdata", "zptuple_t", &g4zpdata,32000,1);
+      zpmetatree = new TTree("zpmeta","zpNtuple run metadata");
+      zpmetatree->Branch("pots", &fZpNPots, "pots/I");
+      
+      mesontree = new TTree("meson", "g4numi Generated Mesons");
+      mesontree->Branch("px", &meson_px, "px/D");
+      mesontree->Branch("py", &meson_py, "py/D");
+      mesontree->Branch("pz", &meson_pz, "pz/D");
+      mesontree->Branch("E", &meson_E, "E/D");
+      mesontree->Branch("x", &meson_x, "x/D");
+      mesontree->Branch("y", &meson_y, "y/D");
+      mesontree->Branch("z", &meson_z, "z/D");
+      mesontree->Branch("t", &meson_t, "t/D");
+      mesontree->Branch("weight", &meson_weight, "weight/D");
+      mesontree->Branch("pdg", &meson_pdg, "pdg/I");
+      mesontree->Branch("tgen", &meson_tgen, "tgen/I");
     }
     else{
       G4Exception("NumiAnalysis","NumiAnalysis",FatalException,"Something went wrong with zpNtuple");
@@ -487,6 +503,10 @@ void NumiAnalysis::finish() {
   if (NumiData->createZpNtuple){
     zpNtuple->cd();
     zptree->Write();
+    fZpNPots = G4RunManager::GetRunManager()->GetCurrentRun()->GetNumberOfEventToBeProcessed();
+    zpmetatree->Fill();
+    zpmetatree->Write();
+    if (mesontree) mesontree->Write();
     zpNtuple->Close();
     delete zpNtuple;
   }
@@ -2047,6 +2067,12 @@ void NumiAnalysis::FillZpNtuple(const G4Track& track,Int_t zpnum)
     g4zpdata->pathlength= track.GetTrackLength()/CLHEP::cm;
     g4zpdata->ptypeatz= track.GetParentID();
 
+    NumiTrackInformation* info = (NumiTrackInformation*)(track.GetUserInformation());
+    if (info) {
+      g4zpdata->nimpwt = info->GetNImpWt();
+      g4zpdata->tgen   = info->GetTgen();
+    }
+
     g4zpdata->pidtype= NumiParticleCode::AsInt(NumiParticleCode::StringToEnum(particleDefinition->GetParticleName()));
     g4zpdata->zpoint=NumiData->Zpoint[zpnum]/CLHEP::cm ;
 
@@ -2071,8 +2097,39 @@ void NumiAnalysis::WriteZpNtuple(){//Jasmine added
     g4zpdata->zpoint=-10000;
     g4zpdata->ptypeatz=-10;
     g4zpdata->pidtype=-10;
+    g4zpdata->nimpwt=-10000;
+    g4zpdata->tgen=-10;
     g4zpdata->run=-100;
     g4zpdata->evtno=-100;
+}
+
+void NumiAnalysis::FillMeson(const G4Track& track)
+{
+  if(!NumiData->raytracing) return ;
+  if(!mesontree) return;
+
+  G4ParticleDefinition* particleDefinition = track.GetDefinition();
+
+  meson_px = track.GetMomentum()[0]/CLHEP::GeV;
+  meson_py = track.GetMomentum()[1]/CLHEP::GeV;
+  meson_pz = track.GetMomentum()[2]/CLHEP::GeV;
+  meson_E  = track.GetTotalEnergy()/CLHEP::GeV;
+  meson_x  = track.GetPosition()[0]/CLHEP::cm;
+  meson_y  = track.GetPosition()[1]/CLHEP::cm;
+  meson_z  = track.GetPosition()[2]/CLHEP::cm;
+  meson_t  = track.GetGlobalTime()/CLHEP::ns;
+
+  meson_weight = 1.0;
+  meson_tgen   = 1;
+
+  NumiTrackInformation* info = (NumiTrackInformation*)(track.GetUserInformation());
+  if (info) {
+     meson_weight = info->GetNImpWt();
+     meson_tgen   = info->GetTgen();
+  }
+  meson_pdg = particleDefinition->GetPDGEncoding();
+
+  mesontree->Fill();
 }
 
 //------------------------------------------------------------------------------------

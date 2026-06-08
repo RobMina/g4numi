@@ -26,7 +26,9 @@ ClassImp(zptuple_t)
   pathlength(-10000),
   ptypeatz(-10),
   pidtype(-10),
-  zpoint(-10)
+  zpoint(-10),
+  nimpwt(-10000),
+  tgen(-10)
 {
   /*
   Int_t run;

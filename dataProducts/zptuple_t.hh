@@ -35,6 +35,8 @@ class zptuple_t
   Int_t ptypeatz;
   Int_t pidtype;
   Double_t zpoint;
+  Double_t nimpwt;
+  Int_t tgen;
  private:
 
 #ifndef CMAKEBUILD

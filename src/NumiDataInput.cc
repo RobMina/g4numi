@@ -242,62 +242,21 @@ if(!vacuumworld && !airhrn){
 //======================================
 //--Ray Tracing parameter-------------
 //--------------------------------------
- raytracing =false;
+ raytracing =true;
  //==============================
  //------------------------------
- 
- //initialize zpoints
- NZpoint=48;
- Zpoint.push_back(0*CLHEP::m); //1
- Zpoint.push_back(0.5*CLHEP::m); //2
- Zpoint.push_back(0.7*CLHEP::m); //3
- Zpoint.push_back(0.75*CLHEP::m); //4
- Zpoint.push_back(0.8*CLHEP::m); //5
- Zpoint.push_back(0.85*CLHEP::m); //6
- Zpoint.push_back(0.9*CLHEP::m); //7
- Zpoint.push_back(1*CLHEP::m); //8
- Zpoint.push_back(1.25*CLHEP::m); //9
- Zpoint.push_back(1.5*CLHEP::m); //10
- Zpoint.push_back(1.75*CLHEP::m); //11
- Zpoint.push_back(2*CLHEP::m);//12
- Zpoint.push_back(2.25*CLHEP::m);//13
- Zpoint.push_back(2.5*CLHEP::m);//14
- Zpoint.push_back(2.75*CLHEP::m); //15
- Zpoint.push_back(3*CLHEP::m);//16
- Zpoint.push_back(3.25*CLHEP::m);//17
- Zpoint.push_back(3.5*CLHEP::m);//18
- Zpoint.push_back(4*CLHEP::m);//19
- Zpoint.push_back(6*CLHEP::m);//20
- Zpoint.push_back(9*CLHEP::m);//21
- Zpoint.push_back(9.5*CLHEP::m); //22
- Zpoint.push_back(9.25*CLHEP::m); //23
- Zpoint.push_back(10*CLHEP::m);//24
- Zpoint.push_back(10.25*CLHEP::m);//25
- Zpoint.push_back(10.5*CLHEP::m);//26
- Zpoint.push_back(10.75*CLHEP::m);//27
- Zpoint.push_back(11.80*CLHEP::m);//28
- Zpoint.push_back(11.9*CLHEP::m);//29
- Zpoint.push_back(11*CLHEP::m);//30
- Zpoint.push_back(11.1*CLHEP::m);//31
- Zpoint.push_back(11.2*CLHEP::m);//32
- Zpoint.push_back(11.25*CLHEP::m);//33
- Zpoint.push_back(11.5*CLHEP::m);//34
- Zpoint.push_back(11.75*CLHEP::m);//35
- Zpoint.push_back(12*CLHEP::m);//36
- Zpoint.push_back(12.25*CLHEP::m);//37
- Zpoint.push_back(12.5*CLHEP::m);//38
- Zpoint.push_back(12.75*CLHEP::m);//39
- Zpoint.push_back(13*CLHEP::m);//40
- Zpoint.push_back(13.25*CLHEP::m);//41
- Zpoint.push_back(13.5*CLHEP::m);//42
- Zpoint.push_back(13.75*CLHEP::m);//43
- Zpoint.push_back(14*CLHEP::m);//43
- Zpoint.push_back(14.5*CLHEP::m);//44
- Zpoint.push_back(15.*CLHEP::m);//45
- Zpoint.push_back(16.*CLHEP::m);//46
- Zpoint.push_back(20*CLHEP::m);//47
- Zpoint.push_back(45.7*CLHEP::m);//48
- createZpNtuple=false;
+
+ // Four z-planes covering the absorber system (world z, CLHEP::m):
+ //  [0] 722.154 m  just before concrete pre-absorber (ShldBox upstream face)
+ //  [1] 723.980 m  just before BluBlock face (HadrBox upstream face)
+ //  [2] 726.738 m  just before steel core (after 8 Al blocks + core_offset)
+ //  [3] 736.703 m  just before rock wall (HadrBox downstream face)
+ NZpoint=4;
+ Zpoint.push_back(722.154*CLHEP::m);
+ Zpoint.push_back(723.98*CLHEP::m);
+ Zpoint.push_back(726.738*CLHEP::m);
+ Zpoint.push_back(736.703*CLHEP::m);
+ createZpNtuple=true;
  zpNtupleName="zpNtuple";
 
 /*

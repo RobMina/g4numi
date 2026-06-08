@@ -78,6 +78,8 @@ public:
    void FillTarNtuple();
    void FillTarNtuple(const G4Track& track);
    void WriteTarNtuple();
+    
+   void FillMeson(const G4Track& track);
 
    NumiTrajectory* GetParentTrajectory(G4int parentID);
    static NumiAnalysis* getInstance();
@@ -117,7 +119,20 @@ private:
    TTree* hadmmtree;
    TTree* absbkgtree;
    TTree* zptree;
+   TTree* zpmetatree;
    TTree* tartree;
+   TTree* mesontree;
+   Double_t meson_px;
+   Double_t meson_py;
+   Double_t meson_pz;
+   Double_t meson_E;
+   Double_t meson_x;
+   Double_t meson_y;
+   Double_t meson_z;
+   Double_t meson_t;
+   Double_t meson_weight;
+   Int_t meson_pdg;
+   Int_t meson_tgen;
    
    data_t *g4data;
    hadmmtuple_t *g4hmmdata;
@@ -129,6 +144,7 @@ private:
    
    G4int fcount;
    G4int fentry;
+   G4int fZpNPots;
    
    std::vector<bool> fAlcEdep_called;
    std::vector<bool> fMuInAlc;

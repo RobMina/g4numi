@@ -882,8 +882,13 @@ void NumiSteppingAction::UserSteppingAction(const G4Step * theStep)
         if((theStep->GetPostStepPoint()->GetPosition()[2]>=NDI->Zpoint[in]&&
             theStep->GetPreStepPoint()->GetPosition()[2]<NDI->Zpoint[in]))
         {
-           NumiAnalysis* analysis=NumiAnalysis::getInstance();
-           analysis->FillZpNtuple(*theTrack,in);
+           G4String ptype = particleDefinition->GetParticleType();
+           if(ptype == "meson" || ptype == "baryon" ||
+              particleDefinition == G4MuonPlus::MuonPlusDefinition() ||
+              particleDefinition == G4MuonMinus::MuonMinusDefinition()) {
+              NumiAnalysis* analysis=NumiAnalysis::getInstance();
+              analysis->FillZpNtuple(*theTrack,in);
+           }
         }
      }
   }

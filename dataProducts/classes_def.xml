@@ -45,9 +45,8 @@
     
   </class>
 
-  <class name="zptuple_t" ClassVersion="10">
-   <version ClassVersion="10" checksum="216253830"/>
-    
+  <class name="zptuple_t" ClassVersion="11">
+    <version ClassVersion="11" checksum="675964489"/>
   </class>
 
 
