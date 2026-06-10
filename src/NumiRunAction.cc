@@ -149,6 +149,7 @@ void NumiRunAction::BeginOfRunAction(const G4Run* aRun)
    G4cout << G4endl;
    G4cout << G4endl;
    G4cout << "  Processing "<<pRunManager->GetNumberOfEvents()<<" particles"<<G4endl;
+   fNDI->FinalizeZPlanes();
    //Book histograms and ntuples
   NumiAnalysis* analysis = NumiAnalysis::getInstance();
   analysis->book();

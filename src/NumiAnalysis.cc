@@ -326,7 +326,7 @@ void NumiAnalysis::book()
     G4cout << "Creating BXDRAW output file : "<< bxdrawFileName <<G4endl;
     std::ofstream bxdrawFile(bxdrawFileName);
   }
-  if(NumiData->raytracing){
+  if(NumiData->createZpNtuple || NumiData->raytracing){
     sprintf(zpNtupleFileName,"%s_%04d%s.root",(NumiData->zpNtupleName).c_str(),pRunManager->GetCurrentRun()->GetRunID(),(NumiData->geometry).c_str());
     G4cout<<"Creating validation and muon tracking ntuple:"<<zpNtupleFileName<<G4endl;
     zpNtuple = new TFile(zpNtupleFileName, "RECREATE","zptrack ntuple");
@@ -336,7 +336,10 @@ void NumiAnalysis::book()
       zptree->Branch("zpdata", "zptuple_t", &g4zpdata,32000,1);
       zpmetatree = new TTree("zpmeta","zpNtuple run metadata");
       zpmetatree->Branch("pots", &fZpNPots, "pots/I");
+      zpmetatree->Branch("n_general_zplanes", &fZpNGeneral, "n_general_zplanes/I");
+      zpmetatree->Branch("n_muon_zplanes", &fZpNMuon, "n_muon_zplanes/I");
       
+      if(NumiData->raytracing){
       mesontree = new TTree("meson", "g4numi Generated Mesons");
       mesontree->Branch("px", &meson_px, "px/D");
       mesontree->Branch("py", &meson_py, "py/D");
@@ -349,6 +352,7 @@ void NumiAnalysis::book()
       mesontree->Branch("weight", &meson_weight, "weight/D");
       mesontree->Branch("pdg", &meson_pdg, "pdg/I");
       mesontree->Branch("tgen", &meson_tgen, "tgen/I");
+      }
     }
     else{
       G4Exception("NumiAnalysis","NumiAnalysis",FatalException,"Something went wrong with zpNtuple");
@@ -500,10 +504,12 @@ void NumiAnalysis::finish() {
     delete absbkgNtuple;
   }
 
-  if (NumiData->createZpNtuple){
+  if (NumiData->createZpNtuple || NumiData->raytracing){
     zpNtuple->cd();
     zptree->Write();
     fZpNPots = G4RunManager::GetRunManager()->GetCurrentRun()->GetNumberOfEventToBeProcessed();
+    fZpNGeneral = NumiData->GetNGeneralZPlanes();
+    fZpNMuon = NumiData->GetNMuonZPlanes();
     zpmetatree->Fill();
     zpmetatree->Write();
     if (mesontree) mesontree->Write();
@@ -2042,7 +2048,7 @@ NumiTrajectory* NumiAnalysis::GetParentTrajectory(G4int parentID)
 //-----------------------------------------------------------------------------
 void NumiAnalysis::FillZpNtuple(const G4Track& track,Int_t zpnum)
 {//---Jasmine added
-  if(!NumiData->raytracing) return ;
+  if(!NumiData->raytracing && !NumiData->createZpNtuple) return ;
   G4RunManager* pRunManager = G4RunManager::GetRunManager();
 
   /*  if(g4zpdata->evtno!=  pRunManager->GetCurrentEvent()->GetEventID())
@@ -2075,6 +2081,10 @@ void NumiAnalysis::FillZpNtuple(const G4Track& track,Int_t zpnum)
 
     g4zpdata->pidtype= NumiParticleCode::AsInt(NumiParticleCode::StringToEnum(particleDefinition->GetParticleName()));
     g4zpdata->zpoint=NumiData->Zpoint[zpnum]/CLHEP::cm ;
+    if(zpnum < (Int_t)NumiData->Zplane_modes.size()){
+      g4zpdata->zplane_mode = NumiData->Zplane_modes[zpnum];
+      g4zpdata->zplane_index = zpnum;
+    }
 
     g4zpdata->run=pRunManager->GetCurrentRun()->GetRunID();
     g4zpdata->evtno = pRunManager->GetCurrentEvent()->GetEventID();
@@ -2099,6 +2109,8 @@ void NumiAnalysis::WriteZpNtuple(){//Jasmine added
     g4zpdata->pidtype=-10;
     g4zpdata->nimpwt=-10000;
     g4zpdata->tgen=-10;
+    g4zpdata->zplane_mode=-10;
+    g4zpdata->zplane_index=-10;
     g4zpdata->run=-100;
     g4zpdata->evtno=-100;
 }

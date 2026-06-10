@@ -5,6 +5,7 @@
 
 //C++
 #include <string>
+#include <algorithm>
 
 #include "G4ProcessManager.hh"
 #include "NumiSteppingAction.hh"
@@ -877,17 +878,46 @@ void NumiSteppingAction::UserSteppingAction(const G4Step * theStep)
   //=======for Raytracing===========
   //--------------------------------
   if(NDI->raytracing || NDI->createZpNtuple){
-     for(G4int in = 0; in<(NDI->NZpoint);in++)//---Jasmine Added
-     {
-        if((theStep->GetPostStepPoint()->GetPosition()[2]>=NDI->Zpoint[in]&&
-            theStep->GetPreStepPoint()->GetPosition()[2]<NDI->Zpoint[in]))
-        {
-           G4String ptype = particleDefinition->GetParticleType();
-           if(ptype == "meson" || ptype == "baryon" ||
-              particleDefinition == G4MuonPlus::MuonPlusDefinition() ||
-              particleDefinition == G4MuonMinus::MuonMinusDefinition()) {
-              NumiAnalysis* analysis=NumiAnalysis::getInstance();
-              analysis->FillZpNtuple(*theTrack,in);
+     const G4double z_pre = theStep->GetPreStepPoint()->GetPosition()[2];
+     const G4double z_post = theStep->GetPostStepPoint()->GetPosition()[2];
+     const bool is_muon =
+        particleDefinition == G4MuonPlus::MuonPlusDefinition() ||
+        particleDefinition == G4MuonMinus::MuonMinusDefinition();
+     const G4String ptype = particleDefinition->GetParticleType();
+     const bool general_particle =
+        ptype == "meson" || ptype == "baryon" || is_muon;
+
+     if (z_post > z_pre && NDI->NZpoint > 0) {
+        vdouble_t::const_iterator begin =
+           std::upper_bound(NDI->Zpoint.begin(), NDI->Zpoint.end(), z_pre);
+        vdouble_t::const_iterator end =
+           std::upper_bound(NDI->Zpoint.begin(), NDI->Zpoint.end(), z_post);
+        for (vdouble_t::const_iterator it = begin; it != end; ++it) {
+           const G4int in = G4int(it - NDI->Zpoint.begin());
+           const ZPlaneMode mode =
+              (in < (G4int)NDI->Zplane_modes.size())
+              ? NDI->Zplane_modes[in] : kZPlaneGeneral;
+           if (mode == kZPlaneMuonOnly) {
+              if (!is_muon) continue;
+           } else if (!general_particle) {
+              continue;
+           }
+           NumiAnalysis* analysis = NumiAnalysis::getInstance();
+           analysis->FillZpNtuple(*theTrack, in);
+        }
+     } else if (z_post < z_pre) {
+        for (G4int in = 0; in < NDI->NZpoint; ++in) {
+           if (z_post <= NDI->Zpoint[in] && z_pre > NDI->Zpoint[in]) {
+              const ZPlaneMode mode =
+                 (in < (G4int)NDI->Zplane_modes.size())
+                 ? NDI->Zplane_modes[in] : kZPlaneGeneral;
+              if (mode == kZPlaneMuonOnly) {
+                 if (!is_muon) continue;
+              } else if (!general_particle) {
+                 continue;
+              }
+              NumiAnalysis* analysis = NumiAnalysis::getInstance();
+              analysis->FillZpNtuple(*theTrack, in);
            }
         }
      }

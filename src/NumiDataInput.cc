@@ -12,6 +12,8 @@
 #include <iomanip>
 #include <iostream>
 #include <stdio.h>
+#include <algorithm>
+#include <sstream>
 
 #include "NumiDataInput.hh"
 #include "G4ThreeVector.hh"
@@ -246,16 +248,20 @@ if(!vacuumworld && !airhrn){
  //==============================
  //------------------------------
 
- // Four z-planes covering the absorber system (world z, CLHEP::m):
+ // Four general z-planes covering the absorber system (world z, metres):
  //  [0] 722.154 m  just before concrete pre-absorber (ShldBox upstream face)
  //  [1] 723.980 m  just before BluBlock face (HadrBox upstream face)
  //  [2] 726.738 m  just before steel core (after 8 Al blocks + core_offset)
  //  [3] 736.703 m  just before rock wall (HadrBox downstream face)
- NZpoint=4;
- Zpoint.push_back(722.154*CLHEP::m);
- Zpoint.push_back(723.98*CLHEP::m);
- Zpoint.push_back(726.738*CLHEP::m);
- Zpoint.push_back(736.703*CLHEP::m);
+ // Additional muon-only planes may be added via /NuMI/zplane/* macro commands.
+ nGeneralZPlanes = 0;
+ nMuonZPlanes = 0;
+ Zplanes.clear();
+ AddGeneralZPlane(722.154*CLHEP::m);
+ AddGeneralZPlane(723.98*CLHEP::m);
+ AddGeneralZPlane(726.738*CLHEP::m);
+ AddGeneralZPlane(736.703*CLHEP::m);
+ FinalizeZPlanes();
  createZpNtuple=true;
  zpNtupleName="zpNtuple";
 
@@ -1924,6 +1930,124 @@ void NumiDataInput::SetBeamSigmaX(G4double val)
 void NumiDataInput::SetBeamSigmaY(G4double val)
 {
   beamSigmaY = val;
+}
+
+//---------------------------------------------------------------------------------
+static G4bool ZPlaneZExists(const std::vector<ZPlaneSpec>& planes, G4double z_len)
+{
+  const G4double tol = 0.1 * CLHEP::mm;
+  for (std::vector<ZPlaneSpec>::const_iterator it = planes.begin();
+       it != planes.end(); ++it) {
+    if (std::fabs(it->z - z_len) < tol) return true;
+  }
+  return false;
+}
+
+void NumiDataInput::AddGeneralZPlane(G4double z)
+{
+  if (ZPlaneZExists(Zplanes, z)) return;
+  ZPlaneSpec spec;
+  spec.z = z;
+  spec.mode = kZPlaneGeneral;
+  Zplanes.push_back(spec);
+}
+
+void NumiDataInput::AddMuonZPlane(G4double z)
+{
+  if (ZPlaneZExists(Zplanes, z)) return;
+  ZPlaneSpec spec;
+  spec.z = z;
+  spec.mode = kZPlaneMuonOnly;
+  Zplanes.push_back(spec);
+}
+
+void NumiDataInput::ClearMuonZPlanes()
+{
+  std::vector<ZPlaneSpec> kept;
+  kept.reserve(Zplanes.size());
+  for (std::vector<ZPlaneSpec>::const_iterator it = Zplanes.begin();
+       it != Zplanes.end(); ++it) {
+    if (it->mode == kZPlaneGeneral) kept.push_back(*it);
+  }
+  Zplanes.swap(kept);
+}
+
+G4bool NumiDataInput::LoadMuonZPlanesFromFile(const G4String& path)
+{
+  std::ifstream in(path.data());
+  if (!in) {
+    G4cout << "NumiDataInput::LoadMuonZPlanesFromFile - cannot open " << path << G4endl;
+    return false;
+  }
+
+  G4int loaded = 0;
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    if (line.find("z_m") != std::string::npos &&
+        line.find("region") != std::string::npos) {
+      continue;
+    }
+
+    std::vector<std::string> fields;
+    std::stringstream ss(line);
+    std::string field;
+    while (std::getline(ss, field, ',')) fields.push_back(field);
+    if (fields.size() < 3) continue;
+
+    G4double z_m = 0.;
+    std::istringstream zstream(fields[2]);
+    if (!(zstream >> z_m)) continue;
+
+    if (!ZPlaneZExists(Zplanes, z_m * CLHEP::m)) {
+      ZPlaneSpec spec;
+      spec.z = z_m * CLHEP::m;
+      spec.mode = kZPlaneMuonOnly;
+      Zplanes.push_back(spec);
+      ++loaded;
+    }
+  }
+
+  G4cout << "NumiDataInput::LoadMuonZPlanesFromFile - loaded " << loaded
+         << " muon z-planes from " << path << G4endl;
+  return true;
+}
+
+void NumiDataInput::FinalizeZPlanes()
+{
+  std::vector<G4int> order(Zplanes.size());
+  for (G4int i = 0; i < (G4int)Zplanes.size(); ++i) order[i] = i;
+  std::sort(order.begin(), order.end(),
+            [this](G4int a, G4int b) { return Zplanes[a].z < Zplanes[b].z; });
+
+  Zpoint.clear();
+  Zplane_modes.clear();
+  nGeneralZPlanes = 0;
+  nMuonZPlanes = 0;
+
+  for (std::vector<G4int>::const_iterator it = order.begin();
+       it != order.end(); ++it) {
+    const ZPlaneSpec& spec = Zplanes[*it];
+    Zpoint.push_back(spec.z);
+    Zplane_modes.push_back(spec.mode);
+    if (spec.mode == kZPlaneGeneral) ++nGeneralZPlanes;
+    else ++nMuonZPlanes;
+  }
+  NZpoint = Zpoint.size();
+
+  G4cout << "NumiDataInput::FinalizeZPlanes - " << NZpoint << " z-planes ("
+         << nGeneralZPlanes << " general, " << nMuonZPlanes << " muon-only)"
+         << G4endl;
+}
+
+void NumiDataInput::ListZPlanes() const
+{
+  G4cout << "Configured z-planes (" << NZpoint << " total):" << G4endl;
+  for (G4int i = 0; i < NZpoint; ++i) {
+    G4cout << "  [" << i << "] z=" << Zpoint[i] / CLHEP::m << " m  mode="
+           << (Zplane_modes[i] == kZPlaneGeneral ? "general" : "muon-only")
+           << G4endl;
+  }
 }
 
 

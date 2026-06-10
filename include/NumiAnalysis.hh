@@ -145,6 +145,8 @@ private:
    G4int fcount;
    G4int fentry;
    G4int fZpNPots;
+   G4int fZpNGeneral;
+   G4int fZpNMuon;
    
    std::vector<bool> fAlcEdep_called;
    std::vector<bool> fMuInAlc;

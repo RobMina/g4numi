@@ -28,7 +28,9 @@ ClassImp(zptuple_t)
   pidtype(-10),
   zpoint(-10),
   nimpwt(-10000),
-  tgen(-10)
+  tgen(-10),
+  zplane_mode(-10),
+  zplane_index(-10)
 {
   /*
   Int_t run;

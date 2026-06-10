@@ -369,6 +369,38 @@ NumiRunActionMessenger::NumiRunActionMessenger(NumiRunAction* RA)
   KillTrackingThreshold->SetDefaultValue(NumiData->KillTrackingThreshold);
   KillTrackingThreshold->AvailableForStates(G4State_PreInit,G4State_Idle);
 
+  ZPlaneDir = new G4UIdirectory("/NuMI/zplane/");
+  ZPlaneDir->SetGuidance("Z-plane registry for zpNtuple raytracing.");
+
+  addGeneralZPlane = new G4UIcmdWithADoubleAndUnit("/NuMI/zplane/addGeneral", this);
+  addGeneralZPlane->SetGuidance("Add a general z-plane (mesons, baryons, muons).");
+  addGeneralZPlane->SetParameterName("z", false);
+  addGeneralZPlane->SetUnitCategory("Length");
+  addGeneralZPlane->AvailableForStates(G4State_PreInit, G4State_Idle);
+
+  addMuonZPlane = new G4UIcmdWithADoubleAndUnit("/NuMI/zplane/addMuon", this);
+  addMuonZPlane->SetGuidance("Add a muon-only z-plane.");
+  addMuonZPlane->SetParameterName("z", false);
+  addMuonZPlane->SetUnitCategory("Length");
+  addMuonZPlane->AvailableForStates(G4State_PreInit, G4State_Idle);
+
+  clearMuonZPlanes = new G4UIcmdWithoutParameter("/NuMI/zplane/clearMuon", this);
+  clearMuonZPlanes->SetGuidance("Remove all muon-only z-planes.");
+  clearMuonZPlanes->AvailableForStates(G4State_PreInit, G4State_Idle);
+
+  loadMuonZPlaneFile = new G4UIcmdWithAString("/NuMI/zplane/loadMuonFile", this);
+  loadMuonZPlaneFile->SetGuidance("Load muon-only z-planes from CSV (z_m column).");
+  loadMuonZPlaneFile->SetParameterName("fileName", false);
+  loadMuonZPlaneFile->AvailableForStates(G4State_PreInit, G4State_Idle);
+
+  finalizeZPlanes = new G4UIcmdWithoutParameter("/NuMI/zplane/finalize", this);
+  finalizeZPlanes->SetGuidance("Sort z-planes and rebuild crossing cache.");
+  finalizeZPlanes->AvailableForStates(G4State_PreInit, G4State_Idle);
+
+  listZPlanes = new G4UIcmdWithoutParameter("/NuMI/zplane/list", this);
+  listZPlanes->SetGuidance("Print configured z-planes.");
+  listZPlanes->AvailableForStates(G4State_PreInit, G4State_Idle);
+
   //Set the Minerva playlist for dkmeta.
   setMinervaPlaylist = new G4UIcmdWithAString("/NuMI/run/setMinervaPlaylist",this);
   setMinervaPlaylist->SetGuidance("set the Minerva playlist for dkmeta");
@@ -466,6 +498,13 @@ NumiRunActionMessenger::~NumiRunActionMessenger()
   delete setZpNtupleFile;
   delete KillTracking;
   delete KillTrackingThreshold;
+  delete ZPlaneDir;
+  delete addGeneralZPlane;
+  delete addMuonZPlane;
+  delete clearMuonZPlanes;
+  delete loadMuonZPlaneFile;
+  delete finalizeZPlanes;
+  delete listZPlanes;
 
   //playlist name for dkmeta:
   delete setMinervaPlaylist;
@@ -662,6 +701,24 @@ void NumiRunActionMessenger::SetNewValue(G4UIcommand* command,G4String newValues
   }
   if (command== KillTrackingThreshold){
      NumiData->SetKillTrackingThreshold(KillTrackingThreshold->GetNewDoubleValue(newValues));
+  }
+  if (command == addGeneralZPlane) {
+     NumiData->AddGeneralZPlane(addGeneralZPlane->GetNewDoubleValue(newValues));
+  }
+  if (command == addMuonZPlane) {
+     NumiData->AddMuonZPlane(addMuonZPlane->GetNewDoubleValue(newValues));
+  }
+  if (command == clearMuonZPlanes) {
+     NumiData->ClearMuonZPlanes();
+  }
+  if (command == loadMuonZPlaneFile) {
+     NumiData->LoadMuonZPlanesFromFile(newValues);
+  }
+  if (command == finalizeZPlanes) {
+     NumiData->FinalizeZPlanes();
+  }
+  if (command == listZPlanes) {
+     NumiData->ListZPlanes();
   }
   if (command == setMinervaPlaylist){
      NumiData->SetPlaylist(newValues);

@@ -20,6 +20,16 @@ typedef std::vector<G4String> vstring_t;
 typedef std::vector<G4bool> vbool_t;
 typedef std::vector<NumiHornSpiderSupport> vNumiHornSpiderSupport_t;
 
+enum ZPlaneMode {
+  kZPlaneGeneral = 0,
+  kZPlaneMuonOnly = 1
+};
+
+struct ZPlaneSpec {
+  G4double z;
+  ZPlaneMode mode;
+};
+
 class NumiDataInput
 {
 public:
@@ -106,6 +116,14 @@ public:
    void SetZpNtupleName(G4String fileName)      { zpNtupleName=fileName; }
    void SetTarNtupleName(G4String fileName)      { tarNtupleName=fileName; }
    void OutputZpNtuple(G4bool val)              { createZpNtuple=val;}
+   void AddGeneralZPlane(G4double z);
+   void AddMuonZPlane(G4double z);
+   void ClearMuonZPlanes();
+   G4bool LoadMuonZPlanesFromFile(const G4String& path);
+   void FinalizeZPlanes();
+   void ListZPlanes() const;
+   G4int GetNGeneralZPlanes() const { return nGeneralZPlanes; }
+   G4int GetNMuonZPlanes() const { return nMuonZPlanes; }
    void SetKillTracking(G4bool val)             { KillTracking = val;}
    void SetKillTrackingThreshold(G4double th )  { KillTrackingThreshold=th;}
    void SetjCompare(G4bool _jc);
@@ -297,7 +315,11 @@ public:
   //----------------------------------
    G4bool useMacro;
    G4int NZpoint ;
-   vdouble_t Zpoint ; // The Z points
+   vdouble_t Zpoint ; // sorted z positions (CLHEP length units), rebuilt by FinalizeZPlanes
+   std::vector<ZPlaneSpec> Zplanes;
+   std::vector<ZPlaneMode> Zplane_modes; // parallel to Zpoint after finalize
+   G4int nGeneralZPlanes;
+   G4int nMuonZPlanes;
    G4String zpNtupleName;
    G4bool createZpNtuple;// name of the zp tuple and the bool of zpntuple
    G4bool raytracing;//

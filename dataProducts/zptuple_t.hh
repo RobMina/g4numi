@@ -37,10 +37,12 @@ class zptuple_t
   Double_t zpoint;
   Double_t nimpwt;
   Int_t tgen;
- private:
+  Int_t zplane_mode;   // 0=general (meson/baryon/muon), 1=muon-only
+  Int_t zplane_index;  // sorted plane index (0..N-1)
+  private:
 
 #ifndef CMAKEBUILD
-  ClassDef(zptuple_t , 1)
+  ClassDef(zptuple_t , 2)
 #endif
   
     };

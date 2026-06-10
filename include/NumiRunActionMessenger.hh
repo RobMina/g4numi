@@ -102,6 +102,13 @@ private:
    G4UIcmdWithAString*         setTarNtupleFile;
    G4UIcmdWithABool*           KillTracking;
    G4UIcmdWithADoubleAndUnit*  KillTrackingThreshold;
+   G4UIdirectory*              ZPlaneDir;
+   G4UIcmdWithADoubleAndUnit*  addGeneralZPlane;
+   G4UIcmdWithADoubleAndUnit*  addMuonZPlane;
+   G4UIcmdWithoutParameter*    clearMuonZPlanes;
+   G4UIcmdWithAString*         loadMuonZPlaneFile;
+   G4UIcmdWithoutParameter*    finalizeZPlanes;
+   G4UIcmdWithoutParameter*    listZPlanes;
    //
    // P. L. Use of Geantinos
    //
