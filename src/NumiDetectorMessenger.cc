@@ -559,7 +559,7 @@ void NumiDetectorMessenger::SetNewValue(G4UIcommand* command,G4String newValue)
    if( command == RunPeriod )          { NumiData->SetRunPeriod(RunPeriod->GetNewIntValue(newValue)); }
    if( command == BeamConfig )         {
        std::transform(newValue.begin(), newValue.end(), newValue.begin(),
-                      std::ptr_fun<int,int>(std::tolower));
+                      [](unsigned char c){ return std::tolower(c); });
 
        NumiData->SetBeamConfig(newValue);
        NumiDetector->SetBeamType(newValue);

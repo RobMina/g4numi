@@ -108,6 +108,8 @@ public:
    void SetBXDRAWName(G4String fileName)        { bxdrawName=fileName; }
    void OutputNuNtuple(G4bool output)           { createNuNtuple=output;}
    void OutputTarNtuple(G4bool output)           { createTarNtuple=output;}
+   void OutputTgtExitTree(G4bool output)         { createTgtExitTree=output;}
+   void OutputMesonProvenance(G4bool output)      { createMesonProvenance=output;}
    void OutputASCII(G4bool output)              { createASCII=output; }
    void OutputBXDRAW(G4bool output)             { createBXDRAW = output; }
    void SetDecayPipeSelect(G4bool val)          { useDecayPipeSelect = val;}
@@ -281,6 +283,12 @@ public:
    //////////////////////////////
 
    G4bool NImpWeightOn, createNuNtuple, createTarNtuple, createHadmmNtuple, createASCII;
+   // fill the "tgtexit" tree in the zpNtuple: mesons crossing the outer
+   // surface of the target assembly (see NumiSteppingAction)
+   G4bool createTgtExitTree;
+   // add ancestry branches to the "meson" tree: creator process, production
+   // volume, parent, and the ancestor that carried the energy out of the target
+   G4bool createMesonProvenance;
    G4bool useFlukaInput, useMarsInput;
 
    G4bool useMuonBeam, useMuonInput, solidMuMons, simAbsBkg, reWeightDeltas;

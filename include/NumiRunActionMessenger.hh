@@ -97,6 +97,8 @@ private:
    
    G4UIcmdWithABool*           UseMacro;
    G4UIcmdWithABool*           outputZpNtuple;
+   G4UIcmdWithABool*           outputTgtExitTree;
+   G4UIcmdWithABool*           outputMesonProvenance;
    G4UIcmdWithAString*         setZpNtupleFile;
    G4UIcmdWithABool*           outputTarNtuple;
    G4UIcmdWithAString*         setTarNtupleFile;

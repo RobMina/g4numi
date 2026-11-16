@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <typeinfo>
+#include <cstring>
 #if defined(__clang__) || defined(__GNUC__)
   // C++ name mangling
   #include <cxxabi.h>
@@ -33,6 +34,10 @@
 #include "G4ParticleTypes.hh"
 #include "G4Navigator.hh"
 #include "G4TransportationManager.hh"
+#include "G4PhysicalVolumeStore.hh"
+#include "G4VPhysicalVolume.hh"
+#include "G4VTouchable.hh"
+#include "G4VProcess.hh"
 #include "G4Run.hh"
 
 #include "G4VUserPhysicsList.hh"
@@ -137,6 +142,10 @@ NumiAnalysis::NumiAnalysis()
   code[3212]  = 22;
   code[3112]  = 20;
   mesontree = 0;
+  tgtexittree = 0;
+  provnamestree = 0;
+  fTgtMotherResolved = false;
+  fTgtMotherPV = 0;
 }
 //------------------------------------------------------------------------------------
 NumiAnalysis::~NumiAnalysis()
@@ -352,6 +361,54 @@ void NumiAnalysis::book()
       mesontree->Branch("weight", &meson_weight, "weight/D");
       mesontree->Branch("pdg", &meson_pdg, "pdg/I");
       mesontree->Branch("tgen", &meson_tgen, "tgen/I");
+
+      // Ancestry of each meson.  Off by default; the branches only appear when
+      // /NuMI/output/outputMesonProvenance is set, so existing readers of the
+      // meson tree are unaffected.
+      if(NumiData->createMesonProvenance){
+         mesontree->Branch("proc",   &meson_proc,   "proc/I");
+         mesontree->Branch("vol",    &meson_vol,    "vol/I");
+         mesontree->Branch("intgt",  &meson_intgt,  "intgt/I");
+         mesontree->Branch("ppdg",   &meson_ppdg,   "ppdg/I");
+         mesontree->Branch("pproc",  &meson_pproc,  "pproc/I");
+         mesontree->Branch("pvol",   &meson_pvol,   "pvol/I");
+         mesontree->Branch("pintgt", &meson_pintgt, "pintgt/I");
+         mesontree->Branch("pE",     &meson_pE,     "pE/D");
+         mesontree->Branch("pvx",    &meson_pvx,    "pvx/D");
+         mesontree->Branch("pvy",    &meson_pvy,    "pvy/D");
+         mesontree->Branch("pvz",    &meson_pvz,    "pvz/D");
+         mesontree->Branch("cflag",  &meson_cflag,  "cflag/I");
+         mesontree->Branch("cpdg",   &meson_cpdg,   "cpdg/I");
+         mesontree->Branch("cproc",  &meson_cproc,  "cproc/I");
+         mesontree->Branch("cgen",   &meson_cgen,   "cgen/I");
+         mesontree->Branch("cE",     &meson_cE,     "cE/D");
+         mesontree->Branch("cvx",    &meson_cvx,    "cvx/D");
+         mesontree->Branch("cvy",    &meson_cvy,    "cvy/D");
+         mesontree->Branch("cvz",    &meson_cvz,    "cvz/D");
+         mesontree->Branch("ivx",    &meson_ivx,    "ivx/D");
+         mesontree->Branch("ivy",    &meson_ivy,    "ivy/D");
+         mesontree->Branch("ivz",    &meson_ivz,    "ivz/D");
+
+         provnamestree = new TTree("provnames", "meson provenance id legend");
+         provnamestree->Branch("id",   &provname_id,   "id/I");
+         provnamestree->Branch("kind", &provname_kind, "kind/I");
+         provnamestree->Branch("name", provname_name,  "name[80]/C");
+      }
+
+      if(NumiData->createTgtExitTree){
+      tgtexittree = new TTree("tgtexit", "g4numi Mesons Leaving the Target");
+      tgtexittree->Branch("px", &tgtexit_px, "px/D");
+      tgtexittree->Branch("py", &tgtexit_py, "py/D");
+      tgtexittree->Branch("pz", &tgtexit_pz, "pz/D");
+      tgtexittree->Branch("E", &tgtexit_E, "E/D");
+      tgtexittree->Branch("x", &tgtexit_x, "x/D");
+      tgtexittree->Branch("y", &tgtexit_y, "y/D");
+      tgtexittree->Branch("z", &tgtexit_z, "z/D");
+      tgtexittree->Branch("t", &tgtexit_t, "t/D");
+      tgtexittree->Branch("weight", &tgtexit_weight, "weight/D");
+      tgtexittree->Branch("pdg", &tgtexit_pdg, "pdg/I");
+      tgtexittree->Branch("tgen", &tgtexit_tgen, "tgen/I");
+      }
       }
     }
     else{
@@ -513,6 +570,24 @@ void NumiAnalysis::finish() {
     zpmetatree->Fill();
     zpmetatree->Write();
     if (mesontree) mesontree->Write();
+    if (tgtexittree) tgtexittree->Write();
+    if (provnamestree){
+       // dump the id legend once, at end of run, from the maps built on the fly
+       for(int kind = 0; kind < 2; ++kind){
+          const std::map<G4String, G4int>& ids = (kind == 0) ? fProcIds : fVolIds;
+          for(std::map<G4String, G4int>::const_iterator it = ids.begin();
+              it != ids.end(); ++it){
+             provname_id   = it->second;
+             provname_kind = kind;
+             strncpy(provname_name, it->first.c_str(), sizeof(provname_name) - 1);
+             provname_name[sizeof(provname_name) - 1] = 0;
+             provnamestree->Fill();
+             G4cout << "provname " << (kind == 0 ? "proc " : "vol  ")
+                    << it->second << " " << it->first << G4endl;
+          }
+       }
+       provnamestree->Write();
+    }
     zpNtuple->Close();
     delete zpNtuple;
   }
@@ -533,8 +608,8 @@ void NumiAnalysis::FillMeta(){
   int NPots = pRunManager->GetCurrentRun()->GetNumberOfEventToBeProcessed();
 
   G4String namentp = (NumiData->nuNtupleName);
-  G4int pos_last = namentp.last('_');
-  namentp.remove(0,pos_last+1);
+  G4int pos_last = namentp.rfind('_');
+  namentp.erase(0,pos_last+1);
   istringstream buffer(namentp);
   int valjob;
   buffer >> valjob;
@@ -584,8 +659,9 @@ void NumiAnalysis::FillMeta(){
   G4String hornC = NumiData->GetBeamConfig();
   G4String tgtC  = NumiData->GetBeamConfig();
   G4int confsize = (NumiData->GetBeamConfig()).length();
-  hornC.remove(0,6);
-  tgtC.remove(6,confsize);
+  // G4String::remove(pos,N) erased N+pos characters, not N -- keep that.
+  hornC.erase(0,6);
+  tgtC.erase(6,confsize+6);
   G4String playlist  = NumiData->GetPlaylist();
 
   G4bool isHe = NumiData->HeInDecayPipe;
@@ -1886,8 +1962,8 @@ void NumiAnalysis::FillNeutrinoNtuple(const G4Track& track, const std::vector<G4
 
   //calculating the job number:
   G4String namentp = (NumiData->nuNtupleName);
-  G4int namesize = (NumiData->nuNtupleName).last('_');
-  namentp.remove(0,namesize+1);
+  G4int namesize = (NumiData->nuNtupleName).rfind('_');
+  namentp.erase(0,namesize+1);
   istringstream buffer(namentp);
   int valjob;
   buffer >> valjob;
@@ -2115,6 +2191,80 @@ void NumiAnalysis::WriteZpNtuple(){//Jasmine added
     g4zpdata->evtno=-100;
 }
 
+//------------------------------------------------------------------------------------
+G4int NumiAnalysis::ProvId(std::map<G4String, G4int>& ids, const G4String& name)
+{
+   std::map<G4String, G4int>::const_iterator it = ids.find(name);
+   if(it != ids.end()) return it->second;
+   G4int id = (G4int)ids.size() + 1;   // 0 is reserved for "unknown"
+   ids[name] = id;
+   return id;
+}
+
+//------------------------------------------------------------------------------------
+// Remember where every track came from, so the ancestry of a meson can be
+// reconstructed without keeping the (much heavier) trajectory objects.  Called
+// from NumiTrackingAction::PreUserTrackingAction for every track, before the
+// meson branch, so a meson's own entry is always in the map by the time
+// FillMeson runs.
+void NumiAnalysis::RecordTrack(const G4Track& track)
+{
+   if(!NumiData->createMesonProvenance) return;
+
+   // one primary proton per event, always tracked first: use it as the reset
+   if(track.GetTrackID() == 1) fTrackProv.clear();
+
+   if(!fTgtMotherResolved){
+      fTgtMotherResolved = true;
+      G4PhysicalVolumeStore* pvStore = G4PhysicalVolumeStore::GetInstance();
+      for(size_t ipv = 0; ipv < pvStore->size(); ++ipv){
+         const G4String& pvName = (*pvStore)[ipv]->GetName();
+         if(pvName == "TargetMotherVol" || pvName == "pvTargetMother"){
+            fTgtMotherPV = (*pvStore)[ipv];
+            break;
+         }
+      }
+      G4cout << "NumiAnalysis: meson provenance on, target mother volume "
+             << (fTgtMotherPV ? fTgtMotherPV->GetName() : G4String("NOT FOUND"))
+             << G4endl;
+   }
+
+   TrackProv prov;
+   prov.pdg      = track.GetDefinition()->GetPDGEncoding();
+   prov.parentID = track.GetParentID();
+   prov.tgen     = 1;
+   prov.E        = track.GetTotalEnergy()/CLHEP::GeV;
+   prov.x        = track.GetPosition()[0]/CLHEP::cm;
+   prov.y        = track.GetPosition()[1]/CLHEP::cm;
+   prov.z        = track.GetPosition()[2]/CLHEP::cm;
+
+   const G4VProcess* creator = track.GetCreatorProcess();
+   prov.proc = ProvId(fProcIds, creator ? creator->GetProcessName()
+                                        : G4String("primary"));
+
+   const G4VPhysicalVolume* pv = track.GetVolume();
+   prov.vol = pv ? ProvId(fVolIds, pv->GetName()) : 0;
+
+   // "inside the target" means anywhere inside the target mother volume --
+   // graphite, casing and cooling water alike.  The vertex position is stored
+   // too, so a tighter graphite-only cut can still be made offline.
+   prov.inTgt = false;
+   if(fTgtMotherPV){
+      const G4VTouchable* touch = track.GetTouchable();
+      if(touch){
+         for(G4int d = 0; d <= touch->GetHistoryDepth(); ++d){
+            if(touch->GetVolume(d) == fTgtMotherPV){ prov.inTgt = true; break; }
+         }
+      }
+   }
+
+   NumiTrackInformation* info = (NumiTrackInformation*)(track.GetUserInformation());
+   if(info) prov.tgen = info->GetTgen();
+
+   fTrackProv[track.GetTrackID()] = prov;
+}
+
+//------------------------------------------------------------------------------------
 void NumiAnalysis::FillMeson(const G4Track& track)
 {
   if(!NumiData->raytracing) return ;
@@ -2141,7 +2291,130 @@ void NumiAnalysis::FillMeson(const G4Track& track)
   }
   meson_pdg = particleDefinition->GetPDGEncoding();
 
+  if(NumiData->createMesonProvenance) FillMesonProvenance(track);
+
   mesontree->Fill();
+}
+
+//------------------------------------------------------------------------------------
+// Walk this meson's ancestry back towards the beam proton and record (a) its
+// own creator process and production volume, (b) the same for its immediate
+// parent, and (c) the "carrier": the last ancestor that was born inside the
+// target and whose next-in-chain daughter was born outside it, i.e. the
+// particle that actually carried the energy out of the target.  If no ancestor
+// was born in the target at all, the carrier is the beam proton itself and the
+// chain never had anything to do with target production -- that is the
+// signature of a proton that made it through the target and showered
+// downstream.
+void NumiAnalysis::FillMesonProvenance(const G4Track& track)
+{
+  meson_proc = meson_vol = meson_intgt = 0;
+  meson_ppdg = meson_pproc = meson_pvol = meson_pintgt = 0;
+  meson_pE = meson_pvx = meson_pvy = meson_pvz = -1e6;
+  meson_cflag = -1;
+  meson_cpdg = meson_cproc = meson_cgen = 0;
+  meson_cE = meson_cvx = meson_cvy = meson_cvz = -1e6;
+  meson_ivx = meson_ivy = meson_ivz = -1e6;
+
+  std::map<G4int, TrackProv>::const_iterator it =
+     fTrackProv.find(track.GetTrackID());
+  if(it == fTrackProv.end()) return;      // should not happen
+
+  const TrackProv self = it->second;
+  meson_proc  = self.proc;
+  meson_vol   = self.vol;
+  meson_intgt = self.inTgt ? 1 : 0;
+
+  // the meson was made in the target: nothing carried it out
+  if(self.inTgt){
+     meson_cflag = 0;
+     meson_ivx = self.x;  meson_ivy = self.y;  meson_ivz = self.z;
+  }
+
+  TrackProv child = self;
+  G4bool haveParent = false;
+  G4int  guard = 0;
+  while(child.parentID != 0 && ++guard < 1000){
+     std::map<G4int, TrackProv>::const_iterator ip = fTrackProv.find(child.parentID);
+     if(ip == fTrackProv.end()) break;
+     const TrackProv& parent = ip->second;
+
+     if(!haveParent){
+        haveParent = true;
+        meson_ppdg   = parent.pdg;
+        meson_pproc  = parent.proc;
+        meson_pvol   = parent.vol;
+        meson_pintgt = parent.inTgt ? 1 : 0;
+        meson_pE     = parent.E;
+        meson_pvx    = parent.x;
+        meson_pvy    = parent.y;
+        meson_pvz    = parent.z;
+     }
+
+     // first target -> outside step going up the chain is the last one that
+     // happened in time, which is the one we want
+     if(meson_cflag < 0 && parent.inTgt && !child.inTgt){
+        meson_cflag = 1;
+        meson_cpdg  = parent.pdg;
+        meson_cproc = parent.proc;
+        meson_cE    = parent.E;
+        meson_cvx   = parent.x;
+        meson_cvy   = parent.y;
+        meson_cvz   = parent.z;
+        meson_cgen  = self.tgen - parent.tgen;
+        meson_ivx   = child.x;
+        meson_ivy   = child.y;
+        meson_ivz   = child.z;
+     }
+
+     if(parent.parentID == 0){
+        // reached the beam proton without ever passing through the target
+        if(meson_cflag < 0){
+           meson_cflag = 2;
+           meson_cpdg  = parent.pdg;
+           meson_cproc = parent.proc;
+           meson_cE    = parent.E;
+           meson_cvx   = parent.x;
+           meson_cvy   = parent.y;
+           meson_cvz   = parent.z;
+           meson_cgen  = self.tgen - parent.tgen;
+           meson_ivx   = child.x;   // where the proton first interacted
+           meson_ivy   = child.y;
+           meson_ivz   = child.z;
+        }
+        break;
+     }
+     child = parent;
+  }
+}
+
+//------------------------------------------------------------------------------------
+void NumiAnalysis::FillTgtExit(const G4Track& track)
+{
+  if(!tgtexittree) return;
+
+  G4ParticleDefinition* particleDefinition = track.GetDefinition();
+
+  tgtexit_px = track.GetMomentum()[0]/CLHEP::GeV;
+  tgtexit_py = track.GetMomentum()[1]/CLHEP::GeV;
+  tgtexit_pz = track.GetMomentum()[2]/CLHEP::GeV;
+  tgtexit_E  = track.GetTotalEnergy()/CLHEP::GeV;
+  tgtexit_x  = track.GetPosition()[0]/CLHEP::cm;
+  tgtexit_y  = track.GetPosition()[1]/CLHEP::cm;
+  tgtexit_z  = track.GetPosition()[2]/CLHEP::cm;
+  tgtexit_t  = track.GetGlobalTime()/CLHEP::ns;
+
+  tgtexit_weight = 1.0;
+  tgtexit_tgen   = 1;
+
+  NumiTrackInformation* info = (NumiTrackInformation*)(track.GetUserInformation());
+  if (info) {
+     tgtexit_weight = info->GetNImpWt();
+     tgtexit_tgen   = info->GetTgen();
+  }
+  tgtexit_pdg = particleDefinition->GetPDGEncoding();
+
+  tgtexittree->Fill();
 }
 
 //------------------------------------------------------------------------------------

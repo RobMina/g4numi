@@ -28,7 +28,7 @@ void NumiDecayPipeMagneticField::GetFieldValue(const double Point[3],double *Bfi
   numinav->SetWorldVolume(theNav->GetWorldVolume());
   G4ThreeVector Pos=G4ThreeVector(Point[0],Point[1],Point[2]); 
   G4VPhysicalVolume* myVol = numinav->LocateGlobalPointAndSetup(Pos);
-  G4TouchableHistoryHandle touchable = numinav->CreateTouchableHistoryHandle();
+  auto touchable = numinav->CreateTouchableHistoryHandle();
   G4ThreeVector localPos = touchable->GetHistory()->GetTopTransform().TransformPoint(Pos);
 
   delete numinav;

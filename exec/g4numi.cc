@@ -33,6 +33,13 @@
 #include "NumiVisManager.hh"
 #endif
 
+#include "G4Version.hh"
+#if G4VERSION_NUMBER >= 1100
+#include "G4HadronicParameters.hh"
+#include "G4HadronicDeveloperParameters.hh"
+#include "CLHEP/Units/SystemOfUnits.h"
+#endif
+
 
 //---------------------------------------------------------------------------
 namespace {
@@ -55,6 +62,44 @@ namespace {
       g4pctorFactory->PrintAvailablePhysicsConstructors();
     }
   }
+
+#if G4VERSION_NUMBER >= 1100
+  // Restore the two FTFP_BERT parameters that are settable and that differ
+  // between the Geant4 10.4.p02 used on the gpvms and Geant4 11.x. Opt-in via
+  // $G4NUMI_G4104_COMPAT, so a local run stays honest 11.x unless asked.
+  //
+  // This is a diagnostic for isolating how much of a local-vs-cluster
+  // difference these two account for. It is NOT a 10.4 compatibility mode: the
+  // FTF and string-fragmentation code was largely rewritten between the two
+  // releases, and a third difference cannot be restored at all -- the
+  // vector/pseudoscalar spin mix went from a scalar 0.5 to a flavour-dependent
+  // {0.5,0.4,0.3} and G4VLongitudinalStringDecay dropped the
+  // SetVectorMesonProbability() setter that 10.4 had.
+  //
+  // Must run before the physics list is built: G4HadronPhysicsFTFP_BERT reads
+  // the transition energies in its constructor.
+  void ApplyG4104CompatParameters()
+  {
+    G4cout << "g4numi: $G4NUMI_G4104_COMPAT set -- applying Geant4 10.4.p02 "
+           << "values for the settable FTFP_BERT parameters" << G4endl;
+
+    // 10.4 hardcoded the BERT/FTF transition to 3-12 GeV; 11.x defaults to 3-6.
+    G4HadronicParameters* hadParams = G4HadronicParameters::Instance();
+    hadParams->SetMinEnergyTransitionFTF_Cascade(  3.0*CLHEP::GeV );
+    hadParams->SetMaxEnergyTransitionFTF_Cascade( 12.0*CLHEP::GeV );
+
+    // For a meson projectile 10.4 used a flat coefficient of 1.0 for target
+    // nuclear destruction (its A-dependent 0.00481*A form was commented out);
+    // 11.x reinstated 0.00481*A. Baryon projectiles use 1.0 in both.
+    G4HadronicDeveloperParameters& hdp =
+      G4HadronicDeveloperParameters::GetInstance();
+    if ( ! hdp.Set("FTF_MESON_NUCDESTR_P1_TGT", 1.0) ||
+         ! hdp.Set("FTF_MESON_NUCDESTR_P1_ADEP_TGT", false) ) {
+      G4cout << "g4numi: WARNING - could not override the FTF meson target "
+             << "destruction parameters" << G4endl;
+    }
+  }
+#endif
 }
 //---------------------------------------------------------------------------
 
@@ -96,6 +141,10 @@ int main(int argc,char** argv)
   }
 
   G4VModularPhysicsList* physicsList = nullptr;
+
+#if G4VERSION_NUMBER >= 1100
+  if ( getenv("G4NUMI_G4104_COMPAT") ) { ApplyG4104CompatParameters(); }
+#endif
 
   G4cout << "g4numi: explicitly using '"
              << physListName << "' for physics list" << G4endl;

@@ -143,6 +143,8 @@ NumiDataInput::NumiDataInput()
   createASCII=false;     createBXDRAW = false;
   useFlukaInput = false; useMarsInput=false;
   createTarNtuple=false;
+  createTgtExitTree=false;
+  createMesonProvenance=false;
 
   //
   //can set useMuonInupt and useMuonBeam from macro

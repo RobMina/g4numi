@@ -78,6 +78,11 @@ void NumiTrackingAction::PreUserTrackingAction(const G4Track* aTrack)
   
   //if a particle is a neutrino then analyse and store in ntuple
   G4ParticleDefinition * particleDefinition = aTrack->GetDefinition();
+
+  // Remember every track's origin (no-op unless meson provenance is enabled).
+  // Must come before FillMeson so a meson can look up its own record.
+  NumiAnalysis::getInstance()->RecordTrack(*aTrack);
+
   if (particleDefinition->GetParticleType() == "meson") {
       NumiAnalysis* analysis = NumiAnalysis::getInstance();
       analysis->FillMeson(*aTrack);

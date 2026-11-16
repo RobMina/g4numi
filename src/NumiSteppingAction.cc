@@ -32,11 +32,15 @@
 #include "NumiRunManager.hh"
 #include "G4FieldManager.hh"
 #include "G4MagneticField.hh"
+#include "G4PhysicalVolumeStore.hh"
 
 #include "CLHEP/Units/PhysicalConstants.h"
 
 NumiSteppingAction::NumiSteppingAction()
-   :fPrintAllSteps(false),
+   :fTgtExitResolved(false),
+    fTgtMotherPV(0),
+    fTgarPV(0),
+    fPrintAllSteps(false),
     fPrintSplitting(false),
     fPrintMuAlcove1(false),
     fPrintMuAlcove2(false),
@@ -138,6 +142,47 @@ void NumiSteppingAction::UserSteppingAction(const G4Step * theStep)
    
    
    
+   //*****************************************************************
+   //*****************************************************************
+   // Mesons crossing the outer surface of the target assembly.
+   //
+   // The meson tree records every meson where it is *created*, anywhere in
+   // the beamline.  A hadron-production measurement such as MIPP
+   // (PRD 90, 032001) instead counts the mesons that actually *leave* the
+   // target, so recording that flux here makes the comparison direct
+   // instead of relying on an analytic absorption correction.
+   //
+   // The surface is the boundary between the target mother volume and the
+   // target hall air (TGAR), which is the analogue of MIPP's "outer edge of
+   // the aluminium pipe encasing the graphite slabs".  Volumes are looked up
+   // once and compared by pointer so this costs nothing per step.
+   if(NDI->createTgtExitTree && particleDefinition->GetParticleType() == "meson"){
+      if(!fTgtExitResolved){
+         fTgtExitResolved = true;
+         G4PhysicalVolumeStore* pvStore = G4PhysicalVolumeStore::GetInstance();
+         for(size_t ipv = 0; ipv < pvStore->size(); ++ipv){
+            const G4String& pvName = (*pvStore)[ipv]->GetName();
+            if(pvName == "TargetMotherVol" || pvName == "pvTargetMother"){
+               fTgtMotherPV = (*pvStore)[ipv];
+            } else if(pvName == "TGAR"){
+               fTgarPV = (*pvStore)[ipv];
+            }
+         }
+         if(!fTgtMotherPV || !fTgarPV){
+            G4cout << "NumiSteppingAction: target-exit tally disabled, "
+                   << "target mother volume or TGAR not found" << G4endl;
+         } else {
+            G4cout << "NumiSteppingAction: target-exit tally on surface "
+                   << fTgtMotherPV->GetName() << " -> TGAR" << G4endl;
+         }
+      }
+      if(fTgtMotherPV && fTgarPV &&
+         theStep->GetPreStepPoint()->GetPhysicalVolume()  == fTgtMotherPV &&
+         theStep->GetPostStepPoint()->GetPhysicalVolume() == fTgarPV){
+         NumiAnalysis* tgtExitAnalysis = NumiAnalysis::getInstance();
+         tgtExitAnalysis->FillTgtExit(*theTrack);
+      }
+   }
    //*****************************************************************
    //*****************************************************************
    //This is for hadron production simulation

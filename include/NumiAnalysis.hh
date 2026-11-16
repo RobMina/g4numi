@@ -22,6 +22,7 @@
 
 class G4ParticleDefinition;
 class G4Step;
+class G4VPhysicalVolume;
 class TFile;
 class TTree;
 class G4Track;
@@ -81,6 +82,19 @@ public:
     
    void FillMeson(const G4Track& track);
 
+   // Mesons crossing the outer surface of the target assembly, i.e. the
+   // flux that actually leaves the target.  Same variables as the meson
+   // tree, but recorded on exit instead of at creation, so the two can be
+   // compared directly (see dm_production_output/g4numi/comparisons/mipp).
+   void FillTgtExit(const G4Track& track);
+
+   // Provenance bookkeeping.  RecordTrack() is called for *every* track at the
+   // start of its tracking, so that when a meson shows up we can walk its
+   // ancestry back to the beam proton without keeping trajectories around.
+   // Cheap: one small struct per track, cleared at the start of each event.
+   void RecordTrack(const G4Track& track);
+   void FillMesonProvenance(const G4Track& track);
+
    NumiTrajectory* GetParentTrajectory(G4int parentID);
    static NumiAnalysis* getInstance();
    
@@ -133,7 +147,70 @@ private:
    Double_t meson_weight;
    Int_t meson_pdg;
    Int_t meson_tgen;
-   
+
+   // --- meson provenance (filled when NumiData->createMesonProvenance) -------
+   // this meson
+   Int_t    meson_proc;      // creator process id (see the provnames tree)
+   Int_t    meson_vol;       // volume id at the production vertex
+   Int_t    meson_intgt;     // 1 if produced inside the target mother volume
+   // its parent
+   Int_t    meson_ppdg;
+   Int_t    meson_pproc;
+   Int_t    meson_pvol;
+   Int_t    meson_pintgt;
+   Double_t meson_pE;        // parent total energy at the parent's own birth
+   Double_t meson_pvx, meson_pvy, meson_pvz;
+   // the ancestor that carried the energy out of the target: the last one born
+   // inside the target whose next-in-chain daughter was born outside it.
+   // meson_cflag: 0 = meson itself born in the target (nothing left it),
+   //              1 = carrier is that last in-target ancestor,
+   //              2 = no ancestor was born in the target, so the carrier is the
+   //                  beam proton itself and meson_i* is where it first
+   //                  interacted along this chain.
+   Int_t    meson_cflag;
+   Int_t    meson_cpdg;
+   Int_t    meson_cproc;
+   Int_t    meson_cgen;      // generations between the carrier and this meson
+   Double_t meson_cE;
+   Double_t meson_cvx, meson_cvy, meson_cvz;
+   Double_t meson_ivx, meson_ivy, meson_ivz;  // where the chain left the target
+
+   // id <-> name legend for meson_proc / meson_vol, written as its own tree
+   TTree* provnamestree;
+   Int_t  provname_id;
+   Int_t  provname_kind;     // 0 = process, 1 = volume
+   char   provname_name[80];
+   std::map<G4String, G4int> fProcIds;
+   std::map<G4String, G4int> fVolIds;
+   G4int ProvId(std::map<G4String, G4int>& ids, const G4String& name);
+
+   struct TrackProv {
+      G4int    pdg;
+      G4int    parentID;
+      G4int    proc;
+      G4int    vol;
+      G4int    tgen;
+      G4bool   inTgt;
+      G4double E;
+      G4double x, y, z;
+   };
+   std::map<G4int, TrackProv> fTrackProv;
+   G4bool fTgtMotherResolved;
+   const G4VPhysicalVolume* fTgtMotherPV;
+
+   TTree* tgtexittree;
+   Double_t tgtexit_px;
+   Double_t tgtexit_py;
+   Double_t tgtexit_pz;
+   Double_t tgtexit_E;
+   Double_t tgtexit_x;
+   Double_t tgtexit_y;
+   Double_t tgtexit_z;
+   Double_t tgtexit_t;
+   Double_t tgtexit_weight;
+   Int_t tgtexit_pdg;
+   Int_t tgtexit_tgen;
+
    data_t *g4data;
    hadmmtuple_t *g4hmmdata;
    draytupleMIB_t *g4draydataMIB;

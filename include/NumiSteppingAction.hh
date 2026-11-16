@@ -10,6 +10,7 @@
 #include "NumiDataInput.hh"
 
 class G4EventManager;
+class G4VPhysicalVolume;
 class NumiEventAction;
 class NumiRunManager;
 
@@ -28,6 +29,11 @@ private:
    NumiRunManager *pRunManager;
    G4EventManager *EvtManager;
    NumiEventAction *NumiEvtAct;
+
+   // Cached volumes for the target-exit tally, resolved on first use.
+   mutable G4bool fTgtExitResolved;
+   mutable const G4VPhysicalVolume* fTgtMotherPV;
+   mutable const G4VPhysicalVolume* fTgarPV;
 
    G4bool fPrintAllSteps;
    G4bool fPrintSplitting;

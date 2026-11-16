@@ -351,6 +351,18 @@ NumiRunActionMessenger::NumiRunActionMessenger(NumiRunAction* RA)
   outputZpNtuple->SetDefaultValue(NumiData->createZpNtuple);
   outputZpNtuple->AvailableForStates(G4State_PreInit,G4State_Idle);
 
+  outputTgtExitTree = new G4UIcmdWithABool("/NuMI/output/outputTgtExitTree",this);
+  outputTgtExitTree->SetGuidance("fill the tgtexit tree: mesons crossing the outer surface of the target");
+  outputTgtExitTree->SetParameterName("createTgtExitTree",true);
+  outputTgtExitTree->SetDefaultValue(NumiData->createTgtExitTree);
+  outputTgtExitTree->AvailableForStates(G4State_PreInit,G4State_Idle);
+
+  outputMesonProvenance = new G4UIcmdWithABool("/NuMI/output/outputMesonProvenance",this);
+  outputMesonProvenance->SetGuidance("add ancestry branches (creator process, volume, parent, target-escape carrier) to the meson tree");
+  outputMesonProvenance->SetParameterName("createMesonProvenance",true);
+  outputMesonProvenance->SetDefaultValue(NumiData->createMesonProvenance);
+  outputMesonProvenance->AvailableForStates(G4State_PreInit,G4State_Idle);
+
   setZpNtupleFile = new G4UIcmdWithAString("/NuMI/output/setZpNtupleFile",this);
   setZpNtupleFile->SetGuidance("set neutrino ntuple file name");
   setZpNtupleFile->SetParameterName("fileName",true);
@@ -495,6 +507,8 @@ NumiRunActionMessenger::~NumiRunActionMessenger()
   //-----------------------------
   delete UseMacro;
   delete outputZpNtuple;
+  delete outputTgtExitTree;
+  delete outputMesonProvenance;
   delete setZpNtupleFile;
   delete KillTracking;
   delete KillTrackingThreshold;
@@ -689,6 +703,12 @@ void NumiRunActionMessenger::SetNewValue(G4UIcommand* command,G4String newValues
     NumiData->SetMacroBeam(UseMacro->GetNewBoolValue(newValues));
   }
   
+  if (command==outputTgtExitTree){
+    NumiData->OutputTgtExitTree(outputTgtExitTree->GetNewBoolValue(newValues));
+  }
+  if (command==outputMesonProvenance){
+    NumiData->OutputMesonProvenance(outputMesonProvenance->GetNewBoolValue(newValues));
+  }
   if (command==outputZpNtuple){
     NumiData->OutputZpNtuple(outputZpNtuple->GetNewBoolValue(newValues));
   }
