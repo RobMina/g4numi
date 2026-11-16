@@ -22,6 +22,8 @@
 
 class G4ParticleDefinition;
 class G4Step;
+class G4StepPoint;
+class G4Material;
 class G4VPhysicalVolume;
 class TFile;
 class TTree;
@@ -94,6 +96,26 @@ public:
    // Cheap: one small struct per track, cleared at the start of each event.
    void RecordTrack(const G4Track& track);
    void FillMesonProvenance(const G4Track& track);
+
+   // EM cascade seeds (/NuMI/output/outputEMSeeds).  A seed is a gamma or
+   // e+- whose creator is not itself an EM-cascade process (see
+   // IsEMCascadeProcess), i.e. it comes from a pi0/eta decay, hadronic
+   // de-excitation, a delta ray of a hadron or muon, a Dalitz pair, ...
+   //  - RecordTrackPdg: every tracked particle, so a seed can report its
+   //    parent's PDG code (called from PreUserTrackingAction).
+   //  - FillEMSeedAtCreation: e+- seeds, recorded from NumiStackingAction at
+   //    birth (they are then killed).
+   //  - CacheEMSeedCreation / FillEMSeedAtInteraction: photon seeds, recorded
+   //    by NumiSteppingAction at their first interaction (then killed).
+   static G4bool IsEMCascadeProcess(const G4String& procName);
+   void RecordTrackPdg(const G4Track& track);
+   void FillEMSeedAtCreation(const G4Track& track);
+   void CacheEMSeedCreation(const G4Track& track, const G4StepPoint* pre);
+   void FillEMSeedAtInteraction(const G4Track& track, const G4Step* step,
+                                const G4String& procName);
+   // pi0/eta that NumiStackingAction kills before they reach the meson tree
+   // (diagnostic; summary printed at end of run when emseed is on).
+   void CountKilledMeson(const G4Track& track, G4int reason);
 
    NumiTrajectory* GetParentTrajectory(G4int parentID);
    static NumiAnalysis* getInstance();
@@ -197,6 +219,40 @@ private:
    std::map<G4int, TrackProv> fTrackProv;
    G4bool fTgtMotherResolved;
    const G4VPhysicalVolume* fTgtMotherPV;
+
+   // --- emseed tree ----------------------------------------------------------
+   TTree* emseedtree;
+   Int_t    es_evt, es_trackID, es_parentID, es_pdg, es_parent_pdg, es_cproc, es_tgen;
+   Double_t es_nimpwt;
+   // at creation
+   Double_t es_E, es_px, es_py, es_pz, es_x, es_y, es_z, es_t;
+   Int_t    es_vol, es_mat;
+   // at the first interaction (e+- seeds: copy of the creation point, iproc 0)
+   Int_t    es_iproc, es_ivol, es_imat;
+   Double_t es_ix, es_iy, es_iz, es_it, es_iE;
+   TTree* emseednamestree;
+   Int_t  esname_id;
+   Int_t  esname_kind;       // 0 = process, 1 = volume, 2 = material
+   char   esname_name[80];
+   std::map<G4String, G4int> fESProcIds;
+   std::map<G4String, G4int> fESVolIds;
+   std::map<G4String, G4int> fESMatIds;
+   std::vector<G4int> fESTrackPdg;   // trackID -> PDG, current event
+   G4int fESTrackPdgEvt;
+   G4int ESVolId(const G4VPhysicalVolume* pv);
+   G4int ESMatId(const G4Material* mat);
+   void  FillEMSeedCommon(const G4Track& track);
+   // cache of the photon currently being tracked (creation point)
+   G4int    fESCacheTrackID, fESCacheEvt;
+   Double_t fESCacheE, fESCachePx, fESCachePy, fESCachePz;
+   Double_t fESCacheX, fESCacheY, fESCacheZ, fESCacheT;
+   G4int    fESCacheVol, fESCacheMat;
+   // counters
+   G4long   fESNPhoton, fESNLepton, fESNNoCache;
+   // killed pi0/eta: [species 0 pi0, 1 eta][reason 0 KE<thr, 1 pz<0]
+   G4long   fKilledN[2][2];
+   G4double fKilledW[2][2];
+   G4double fKilledWE[2][2];
 
    TTree* tgtexittree;
    Double_t tgtexit_px;

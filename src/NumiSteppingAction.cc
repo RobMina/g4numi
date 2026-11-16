@@ -33,6 +33,7 @@
 #include "G4FieldManager.hh"
 #include "G4MagneticField.hh"
 #include "G4PhysicalVolumeStore.hh"
+#include "G4VProcess.hh"
 
 #include "CLHEP/Units/PhysicalConstants.h"
 
@@ -84,6 +85,30 @@ void NumiSteppingAction::UserSteppingAction(const G4Step * theStep)
 //  
    G4StepPoint* prePtr =theStep->GetPreStepPoint(); 
    G4ParticleDefinition * particleDefinition = theTrack->GetDefinition();
+
+   //*****************************************************************
+   // EM cascade seeds (/NuMI/output/outputEMSeeds).  With the option on,
+   // the only photons that survive NumiStackingAction are seeds.  Follow each
+   // one to its first interaction (skipping Rayleigh, which does not start a
+   // cascade), record it in the emseed tree and kill it together with the
+   // secondaries of that step, so the cascade is left to PETITE.  A photon
+   // that leaves the world is recorded with process "OutOfWorld".  Nothing
+   // else in this action applies to these photons.
+   if(NDI->createEMSeeds && !NDI->GetSimDRays() && !NDI->useMuonBeam &&
+      particleDefinition == G4Gamma::GammaDefinition()){
+      if(theTrack->GetCurrentStepNumber() == 1) analysis->CacheEMSeedCreation(*theTrack, prePtr);
+      const G4StepPoint* postPtr = theStep->GetPostStepPoint();
+      const G4VProcess* proc = postPtr->GetProcessDefinedStep();
+      G4String pname = proc ? proc->GetProcessName() : G4String("none");
+      G4bool leftWorld = (postPtr->GetPhysicalVolume() == 0);
+      if(leftWorld) pname = "OutOfWorld";
+      if(leftWorld || (pname != "Transportation" && pname != "CoupledTransportation" &&
+                       pname != "Rayl")){
+         analysis->FillEMSeedAtInteraction(*theTrack, theStep, pname);
+         theTrack->SetTrackStatus(fKillTrackAndSecondaries);
+      }
+      return;
+   }
 #define KILL_LOOPER
 #ifdef KILL_LOOPER
    // rhatcher - 2022-06-15

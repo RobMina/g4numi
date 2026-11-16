@@ -42,6 +42,11 @@
 
 #include "G4VUserPhysicsList.hh"
 #include "G4Version.hh"
+#include "G4Material.hh"
+#include "G4LogicalVolume.hh"
+#include "G4Step.hh"
+#include "G4StepPoint.hh"
+#include "G4Event.hh"
 
 
 #include "CLHEP/Units/PhysicalConstants.h"
@@ -144,6 +149,15 @@ NumiAnalysis::NumiAnalysis()
   mesontree = 0;
   tgtexittree = 0;
   provnamestree = 0;
+  emseedtree = 0;
+  emseednamestree = 0;
+  fESTrackPdgEvt = -1;
+  fESCacheTrackID = -1;
+  fESCacheEvt = -1;
+  fESNPhoton = fESNLepton = fESNNoCache = 0;
+  for(int i = 0; i < 2; ++i) for(int j = 0; j < 2; ++j){
+     fKilledN[i][j] = 0; fKilledW[i][j] = 0.; fKilledWE[i][j] = 0.;
+  }
   fTgtMotherResolved = false;
   fTgtMotherPV = 0;
 }
@@ -410,6 +424,53 @@ void NumiAnalysis::book()
       tgtexittree->Branch("tgen", &tgtexit_tgen, "tgen/I");
       }
       }
+
+      // EM cascade seeds.  Off by default: the tree only exists when
+      // /NuMI/output/outputEMSeeds is set, so the file is otherwise unchanged.
+      // Not compatible with the delta-ray / muon-beam modes, which track
+      // photons and e+- themselves.
+      if(NumiData->createEMSeeds){
+         if(NumiData->GetSimDRays() || NumiData->useMuonBeam){
+            G4cout << "NumiAnalysis: outputEMSeeds ignored, simDRays or "
+                   << "useMuonBeam is on" << G4endl;
+            NumiData->OutputEMSeeds(false);
+         } else {
+            emseedtree = new TTree("emseed", "g4numi EM cascade seeds (gamma, e+-)");
+            emseedtree->Branch("evt",        &es_evt,        "evt/I");
+            emseedtree->Branch("trackID",    &es_trackID,    "trackID/I");
+            emseedtree->Branch("parentID",   &es_parentID,   "parentID/I");
+            emseedtree->Branch("pdg",        &es_pdg,        "pdg/I");
+            emseedtree->Branch("parent_pdg", &es_parent_pdg, "parent_pdg/I");
+            emseedtree->Branch("cproc",      &es_cproc,      "cproc/I");
+            emseedtree->Branch("nimpwt",     &es_nimpwt,     "nimpwt/D");
+            emseedtree->Branch("tgen",       &es_tgen,       "tgen/I");
+            emseedtree->Branch("E",   &es_E,   "E/D");
+            emseedtree->Branch("px",  &es_px,  "px/D");
+            emseedtree->Branch("py",  &es_py,  "py/D");
+            emseedtree->Branch("pz",  &es_pz,  "pz/D");
+            emseedtree->Branch("x",   &es_x,   "x/D");
+            emseedtree->Branch("y",   &es_y,   "y/D");
+            emseedtree->Branch("z",   &es_z,   "z/D");
+            emseedtree->Branch("t",   &es_t,   "t/D");
+            emseedtree->Branch("vol", &es_vol, "vol/I");
+            emseedtree->Branch("mat", &es_mat, "mat/I");
+            emseedtree->Branch("iproc", &es_iproc, "iproc/I");
+            emseedtree->Branch("ix",    &es_ix,    "ix/D");
+            emseedtree->Branch("iy",    &es_iy,    "iy/D");
+            emseedtree->Branch("iz",    &es_iz,    "iz/D");
+            emseedtree->Branch("it",    &es_it,    "it/D");
+            emseedtree->Branch("iE",    &es_iE,    "iE/D");
+            emseedtree->Branch("ivol",  &es_ivol,  "ivol/I");
+            emseedtree->Branch("imat",  &es_imat,  "imat/I");
+
+            emseednamestree = new TTree("emseednames", "emseed id legend");
+            emseednamestree->Branch("id",   &esname_id,   "id/I");
+            emseednamestree->Branch("kind", &esname_kind, "kind/I");
+            emseednamestree->Branch("name", esname_name,  "name[80]/C");
+            G4cout << "NumiAnalysis: emseed tree on, threshold E >= "
+                   << NumiData->EMSeedMinEnergy/CLHEP::MeV << " MeV" << G4endl;
+         }
+      }
     }
     else{
       G4Exception("NumiAnalysis","NumiAnalysis",FatalException,"Something went wrong with zpNtuple");
@@ -587,6 +648,63 @@ void NumiAnalysis::finish() {
           }
        }
        provnamestree->Write();
+    }
+    if (emseedtree){
+       emseedtree->Write();
+       // legend: id 0 of each kind is "none"/unknown
+       for(int kind = 0; kind < 3; ++kind){
+          const std::map<G4String, G4int>& ids =
+             (kind == 0) ? fESProcIds : (kind == 1) ? fESVolIds : fESMatIds;
+          esname_id = 0;  esname_kind = kind;
+          strncpy(esname_name, kind == 0 ? "none" : "unknown", sizeof(esname_name) - 1);
+          esname_name[sizeof(esname_name) - 1] = 0;
+          emseednamestree->Fill();
+          for(std::map<G4String, G4int>::const_iterator it = ids.begin();
+              it != ids.end(); ++it){
+             esname_id   = it->second;
+             esname_kind = kind;
+             strncpy(esname_name, it->first.c_str(), sizeof(esname_name) - 1);
+             esname_name[sizeof(esname_name) - 1] = 0;
+             emseednamestree->Fill();
+          }
+       }
+       emseednamestree->Write();
+
+       // run summary: seed counts and the pi0/eta the stacking cuts drop
+       TTree* esmeta = new TTree("emseedmeta", "emseed run summary");
+       Int_t    m_pots = fZpNPots;
+       Double_t m_emin = NumiData->EMSeedMinEnergy/CLHEP::GeV;
+       Double_t m_kthr = NumiData->GetKillTracking() ? NumiData->GetKillTrackingThreshold()/CLHEP::GeV : 0.;
+       Long64_t m_nph = fESNPhoton, m_nlep = fESNLepton;
+       // order: pi0 KE<thr, pi0 pz<0, eta KE<thr, eta pz<0
+       Long64_t m_kn[4];
+       Double_t m_kw[4], m_kwe[4];
+       for(int i = 0; i < 2; ++i) for(int j = 0; j < 2; ++j){
+          m_kn[2*i+j] = fKilledN[i][j]; m_kw[2*i+j] = fKilledW[i][j]; m_kwe[2*i+j] = fKilledWE[i][j];
+       }
+       esmeta->Branch("pots",      &m_pots, "pots/I");
+       esmeta->Branch("emin",      &m_emin, "emin/D");
+       esmeta->Branch("kill_thr",  &m_kthr, "kill_thr/D");
+       esmeta->Branch("n_photon",  &m_nph,  "n_photon/L");
+       esmeta->Branch("n_lepton",  &m_nlep, "n_lepton/L");
+       esmeta->Branch("killed_n",  m_kn,    "killed_n[4]/L");
+       esmeta->Branch("killed_w",  m_kw,    "killed_w[4]/D");
+       esmeta->Branch("killed_wE", m_kwe,   "killed_wE[4]/D");
+       esmeta->Fill();
+       esmeta->Write();
+
+       G4cout << "EMSeed summary: " << fESNPhoton << " photon seeds, "
+              << fESNLepton << " e+- seeds over " << fZpNPots << " POT ("
+              << (fZpNPots > 0 ? double(fESNPhoton + fESNLepton)/fZpNPots : 0.)
+              << " per POT); photons without a creation cache: " << fESNNoCache << G4endl;
+       const char* sp[2] = {"pi0", "eta"};
+       const char* rs[2] = {"KE<KillTrackingThreshold", "pz<0"};
+       for(int i = 0; i < 2; ++i) for(int j = 0; j < 2; ++j){
+          G4cout << "EMSeed killed " << sp[i] << " " << rs[j] << ": n=" << fKilledN[i][j]
+                 << " sum(w)/POT=" << (fZpNPots > 0 ? fKilledW[i][j]/fZpNPots : 0.)
+                 << " sum(w*E)/POT=" << (fZpNPots > 0 ? fKilledWE[i][j]/fZpNPots : 0.)
+                 << " GeV" << G4endl;
+       }
     }
     zpNtuple->Close();
     delete zpNtuple;
@@ -2415,6 +2533,159 @@ void NumiAnalysis::FillTgtExit(const G4Track& track)
   tgtexit_pdg = particleDefinition->GetPDGEncoding();
 
   tgtexittree->Fill();
+}
+
+//------------------------------------------------------------------------------------
+// EM cascade seeds.
+//
+// Processes whose secondaries are part of an EM cascade that is already being
+// followed from its seed.  Any gamma/e+- made by something else starts a new
+// cascade.  GammaGeneralProc is the Geant4 11 wrapper of conv/compt/phot.
+G4bool NumiAnalysis::IsEMCascadeProcess(const G4String& procName)
+{
+   static const char* const kCascade[] = {
+      "conv", "compt", "phot", "eBrem", "eIoni", "annihil", "msc",
+      "Rayl", "ePairProd", "CoulombScat", "eCoulombScat", "GammaGeneralProc"
+   };
+   for(size_t i = 0; i < sizeof(kCascade)/sizeof(kCascade[0]); ++i)
+      if(procName == kCascade[i]) return true;
+   return false;
+}
+
+G4int NumiAnalysis::ESVolId(const G4VPhysicalVolume* pv)
+{
+   return pv ? ProvId(fESVolIds, pv->GetName()) : ProvId(fESVolIds, "OutOfWorld");
+}
+
+G4int NumiAnalysis::ESMatId(const G4Material* mat)
+{
+   return mat ? ProvId(fESMatIds, mat->GetName()) : 0;
+}
+
+void NumiAnalysis::RecordTrackPdg(const G4Track& track)
+{
+   if(!emseedtree) return;
+   G4int evt = G4RunManager::GetRunManager()->GetCurrentEvent()->GetEventID();
+   if(evt != fESTrackPdgEvt){ fESTrackPdg.clear(); fESTrackPdgEvt = evt; }
+   G4int id = track.GetTrackID();
+   if(id < 0) return;
+   if((size_t)id >= fESTrackPdg.size()) fESTrackPdg.resize(2*id + 64, 0);
+   fESTrackPdg[id] = track.GetDefinition()->GetPDGEncoding();
+}
+
+void NumiAnalysis::FillEMSeedCommon(const G4Track& track)
+{
+   es_evt      = G4RunManager::GetRunManager()->GetCurrentEvent()->GetEventID();
+   es_trackID  = track.GetTrackID();
+   es_parentID = track.GetParentID();
+   es_pdg      = track.GetDefinition()->GetPDGEncoding();
+   es_parent_pdg = 0;
+   if(es_evt == fESTrackPdgEvt && es_parentID > 0 &&
+      (size_t)es_parentID < fESTrackPdg.size())
+      es_parent_pdg = fESTrackPdg[es_parentID];
+   const G4VProcess* creator = track.GetCreatorProcess();
+   es_cproc = ProvId(fESProcIds, creator ? creator->GetProcessName() : G4String("primary"));
+   es_nimpwt = 1.0;
+   es_tgen   = 1;
+   NumiTrackInformation* info = (NumiTrackInformation*)(track.GetUserInformation());
+   if(info){ es_nimpwt = info->GetNImpWt(); es_tgen = info->GetTgen(); }
+}
+
+// e+- seed: creation point only.  The "interaction" block repeats the
+// creation point with iproc = 0, since an electron starts showering at birth.
+void NumiAnalysis::FillEMSeedAtCreation(const G4Track& track)
+{
+   if(!emseedtree) return;
+   FillEMSeedCommon(track);
+   es_E  = track.GetTotalEnergy()/CLHEP::GeV;
+   es_px = track.GetMomentum()[0]/CLHEP::GeV;
+   es_py = track.GetMomentum()[1]/CLHEP::GeV;
+   es_pz = track.GetMomentum()[2]/CLHEP::GeV;
+   es_x  = track.GetPosition()[0]/CLHEP::cm;
+   es_y  = track.GetPosition()[1]/CLHEP::cm;
+   es_z  = track.GetPosition()[2]/CLHEP::cm;
+   es_t  = track.GetGlobalTime()/CLHEP::ns;
+   const G4VPhysicalVolume* pv = track.GetVolume();
+   es_vol = ESVolId(pv);
+   es_mat = (pv && pv->GetLogicalVolume()) ? ESMatId(pv->GetLogicalVolume()->GetMaterial()) : 0;
+   es_iproc = 0;
+   es_ix = es_x; es_iy = es_y; es_iz = es_z; es_it = es_t; es_iE = es_E;
+   es_ivol = es_vol; es_imat = es_mat;
+   emseedtree->Fill();
+   ++fESNLepton;
+}
+
+// photon seed, first step: remember where it was born
+void NumiAnalysis::CacheEMSeedCreation(const G4Track& track, const G4StepPoint* pre)
+{
+   if(!emseedtree || !pre) return;
+   fESCacheTrackID = track.GetTrackID();
+   fESCacheEvt = G4RunManager::GetRunManager()->GetCurrentEvent()->GetEventID();
+   fESCacheE  = pre->GetTotalEnergy()/CLHEP::GeV;
+   fESCachePx = pre->GetMomentum()[0]/CLHEP::GeV;
+   fESCachePy = pre->GetMomentum()[1]/CLHEP::GeV;
+   fESCachePz = pre->GetMomentum()[2]/CLHEP::GeV;
+   fESCacheX  = pre->GetPosition()[0]/CLHEP::cm;
+   fESCacheY  = pre->GetPosition()[1]/CLHEP::cm;
+   fESCacheZ  = pre->GetPosition()[2]/CLHEP::cm;
+   fESCacheT  = pre->GetGlobalTime()/CLHEP::ns;
+   fESCacheVol = ESVolId(pre->GetPhysicalVolume());
+   fESCacheMat = ESMatId(pre->GetMaterial());
+}
+
+// photon seed, first interaction (or leaving the world)
+void NumiAnalysis::FillEMSeedAtInteraction(const G4Track& track, const G4Step* step,
+                                           const G4String& procName)
+{
+   if(!emseedtree) return;
+   FillEMSeedCommon(track);
+   if(fESCacheTrackID == es_trackID && fESCacheEvt == es_evt){
+      es_E = fESCacheE; es_px = fESCachePx; es_py = fESCachePy; es_pz = fESCachePz;
+      es_x = fESCacheX; es_y = fESCacheY; es_z = fESCacheZ; es_t = fESCacheT;
+      es_vol = fESCacheVol; es_mat = fESCacheMat;
+   } else {
+      // should not happen: fall back on the vertex stored in the track
+      ++fESNNoCache;
+      G4double ke = track.GetVertexKineticEnergy();
+      const G4ThreeVector& d = track.GetVertexMomentumDirection();
+      es_E  = ke/CLHEP::GeV;
+      es_px = ke*d[0]/CLHEP::GeV; es_py = ke*d[1]/CLHEP::GeV; es_pz = ke*d[2]/CLHEP::GeV;
+      es_x  = track.GetVertexPosition()[0]/CLHEP::cm;
+      es_y  = track.GetVertexPosition()[1]/CLHEP::cm;
+      es_z  = track.GetVertexPosition()[2]/CLHEP::cm;
+      es_t  = (track.GetGlobalTime() - track.GetLocalTime())/CLHEP::ns;
+      es_vol = 0;
+      const G4LogicalVolume* lv = track.GetLogicalVolumeAtVertex();
+      es_mat = lv ? ESMatId(lv->GetMaterial()) : 0;
+   }
+   const G4StepPoint* pre  = step->GetPreStepPoint();
+   const G4StepPoint* post = step->GetPostStepPoint();
+   es_iproc = ProvId(fESProcIds, procName);
+   es_ix = post->GetPosition()[0]/CLHEP::cm;
+   es_iy = post->GetPosition()[1]/CLHEP::cm;
+   es_iz = post->GetPosition()[2]/CLHEP::cm;
+   es_it = post->GetGlobalTime()/CLHEP::ns;
+   es_iE = pre->GetTotalEnergy()/CLHEP::GeV;
+   es_ivol = ESVolId(pre->GetPhysicalVolume());
+   es_imat = ESMatId(pre->GetMaterial());
+   emseedtree->Fill();
+   ++fESNPhoton;
+}
+
+// reason 0: KE below KillTrackingThreshold, 1: pz < 0.  The weight is the
+// parent's importance weight, which is what the track would have carried on
+// average had it survived the importance sampling.
+void NumiAnalysis::CountKilledMeson(const G4Track& track, G4int reason)
+{
+   G4int pdg = track.GetDefinition()->GetPDGEncoding();
+   G4int isp = (pdg == 111) ? 0 : (pdg == 221) ? 1 : -1;
+   if(isp < 0 || reason < 0 || reason > 1) return;
+   G4double w = 1.0;
+   NumiTrackInformation* info = (NumiTrackInformation*)(track.GetUserInformation());
+   if(info) w = info->GetNImpWt();
+   fKilledN[isp][reason]  += 1;
+   fKilledW[isp][reason]  += w;
+   fKilledWE[isp][reason] += w*track.GetTotalEnergy()/CLHEP::GeV;
 }
 
 //------------------------------------------------------------------------------------

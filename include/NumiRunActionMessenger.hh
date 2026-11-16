@@ -99,6 +99,8 @@ private:
    G4UIcmdWithABool*           outputZpNtuple;
    G4UIcmdWithABool*           outputTgtExitTree;
    G4UIcmdWithABool*           outputMesonProvenance;
+   G4UIcmdWithABool*           outputEMSeeds;
+   G4UIcmdWithADoubleAndUnit*  EMSeedMinEnergy;
    G4UIcmdWithAString*         setZpNtupleFile;
    G4UIcmdWithABool*           outputTarNtuple;
    G4UIcmdWithAString*         setTarNtupleFile;

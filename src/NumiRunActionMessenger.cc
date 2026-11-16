@@ -363,6 +363,19 @@ NumiRunActionMessenger::NumiRunActionMessenger(NumiRunAction* RA)
   outputMesonProvenance->SetDefaultValue(NumiData->createMesonProvenance);
   outputMesonProvenance->AvailableForStates(G4State_PreInit,G4State_Idle);
 
+  outputEMSeeds = new G4UIcmdWithABool("/NuMI/output/outputEMSeeds",this);
+  outputEMSeeds->SetGuidance("fill the emseed tree: photons and e+- that start EM cascades (pi0/eta decays, de-excitation, delta rays), recorded at their first interaction and then killed");
+  outputEMSeeds->SetParameterName("createEMSeeds",true);
+  outputEMSeeds->SetDefaultValue(NumiData->createEMSeeds);
+  outputEMSeeds->AvailableForStates(G4State_PreInit,G4State_Idle);
+
+  EMSeedMinEnergy = new G4UIcmdWithADoubleAndUnit("/NuMI/output/EMSeedMinEnergy",this);
+  EMSeedMinEnergy->SetGuidance("total-energy threshold for an emseed photon or e+- (default 10 MeV)");
+  EMSeedMinEnergy->SetParameterName("EMSeedMinEnergy",true);
+  EMSeedMinEnergy->SetDefaultValue(NumiData->EMSeedMinEnergy);
+  EMSeedMinEnergy->SetDefaultUnit("MeV");
+  EMSeedMinEnergy->AvailableForStates(G4State_PreInit,G4State_Idle);
+
   setZpNtupleFile = new G4UIcmdWithAString("/NuMI/output/setZpNtupleFile",this);
   setZpNtupleFile->SetGuidance("set neutrino ntuple file name");
   setZpNtupleFile->SetParameterName("fileName",true);
@@ -509,6 +522,8 @@ NumiRunActionMessenger::~NumiRunActionMessenger()
   delete outputZpNtuple;
   delete outputTgtExitTree;
   delete outputMesonProvenance;
+  delete outputEMSeeds;
+  delete EMSeedMinEnergy;
   delete setZpNtupleFile;
   delete KillTracking;
   delete KillTrackingThreshold;
@@ -708,6 +723,12 @@ void NumiRunActionMessenger::SetNewValue(G4UIcommand* command,G4String newValues
   }
   if (command==outputMesonProvenance){
     NumiData->OutputMesonProvenance(outputMesonProvenance->GetNewBoolValue(newValues));
+  }
+  if (command==outputEMSeeds){
+    NumiData->OutputEMSeeds(outputEMSeeds->GetNewBoolValue(newValues));
+  }
+  if (command==EMSeedMinEnergy){
+    NumiData->SetEMSeedMinEnergy(EMSeedMinEnergy->GetNewDoubleValue(newValues));
   }
   if (command==outputZpNtuple){
     NumiData->OutputZpNtuple(outputZpNtuple->GetNewBoolValue(newValues));

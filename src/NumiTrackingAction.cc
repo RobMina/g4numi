@@ -82,6 +82,8 @@ void NumiTrackingAction::PreUserTrackingAction(const G4Track* aTrack)
   // Remember every track's origin (no-op unless meson provenance is enabled).
   // Must come before FillMeson so a meson can look up its own record.
   NumiAnalysis::getInstance()->RecordTrack(*aTrack);
+  // trackID -> PDG for the emseed parent_pdg branch (no-op unless emseed is on)
+  NumiAnalysis::getInstance()->RecordTrackPdg(*aTrack);
 
   if (particleDefinition->GetParticleType() == "meson") {
       NumiAnalysis* analysis = NumiAnalysis::getInstance();

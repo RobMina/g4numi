@@ -145,6 +145,8 @@ NumiDataInput::NumiDataInput()
   createTarNtuple=false;
   createTgtExitTree=false;
   createMesonProvenance=false;
+  createEMSeeds=false;
+  EMSeedMinEnergy=10.0*CLHEP::MeV;
 
   //
   //can set useMuonInupt and useMuonBeam from macro

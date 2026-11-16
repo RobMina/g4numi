@@ -110,6 +110,8 @@ public:
    void OutputTarNtuple(G4bool output)           { createTarNtuple=output;}
    void OutputTgtExitTree(G4bool output)         { createTgtExitTree=output;}
    void OutputMesonProvenance(G4bool output)      { createMesonProvenance=output;}
+   void OutputEMSeeds(G4bool output)             { createEMSeeds=output;}
+   void SetEMSeedMinEnergy(G4double e)           { EMSeedMinEnergy=e;}
    void OutputASCII(G4bool output)              { createASCII=output; }
    void OutputBXDRAW(G4bool output)             { createBXDRAW = output; }
    void SetDecayPipeSelect(G4bool val)          { useDecayPipeSelect = val;}
@@ -289,6 +291,12 @@ public:
    // add ancestry branches to the "meson" tree: creator process, production
    // volume, parent, and the ancestor that carried the energy out of the target
    G4bool createMesonProvenance;
+   // fill the "emseed" tree in the zpNtuple: photons and e+- that start an EM
+   // cascade (pi0/eta decays, hadronic de-excitation, delta rays from hadrons
+   // and muons, Dalitz pairs), recorded at their first interaction and then
+   // killed.  EMSeedMinEnergy is the total-energy threshold for a seed.
+   G4bool createEMSeeds;
+   G4double EMSeedMinEnergy;
    G4bool useFlukaInput, useMarsInput;
 
    G4bool useMuonBeam, useMuonInput, solidMuMons, simAbsBkg, reWeightDeltas;

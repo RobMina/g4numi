@@ -19,6 +19,7 @@
 #include "NumiTrajectory.hh"
 #include "NumiAnalysis.hh"
 #include "NumiRunManager.hh"
+#include "G4VProcess.hh"
 
 #include "CLHEP/Units/PhysicalConstants.h"
 
@@ -67,8 +68,29 @@ G4ClassificationOfNewTrack NumiStackingAction::ClassifyNewTrack(const G4Track * 
      classification = fKill;
   }
   
+  // EM cascade seeds (/NuMI/output/outputEMSeeds, off by default): a gamma or
+  // e+- above threshold whose creator is not an EM-cascade process (pi0/eta
+  // decay, de-excitation, delta ray of a hadron or muon, Dalitz pair, ...) is
+  // exempt from the EM, pz<0 and kinetic-energy kills below and from the
+  // importance sampling (it keeps its parent's weight).  e+- seeds are
+  // recorded here and killed; photon seeds are tracked to their first
+  // interaction, recorded and killed in NumiSteppingAction.  Every other
+  // gamma/e+- is killed as before.
+  G4bool isEMSeed = false;
+  if ( NumiData->createEMSeeds && !(NumiData->GetSimDRays()) && !(NumiData->useMuonBeam) &&
+       ( particleType==G4Gamma::GammaDefinition() ||
+         particleType==G4Electron::ElectronDefinition() ||
+         particleType==G4Positron::PositronDefinition() ) &&
+       classification != fKill )
+  {
+     const G4VProcess* creator = aTrack->GetCreatorProcess();
+     isEMSeed = creator != 0 &&
+                !NumiAnalysis::IsEMCascadeProcess(creator->GetProcessName()) &&
+                aTrack->GetTotalEnergy() >= NumiData->EMSeedMinEnergy;
+  }
+
   // Discard Gammas, Electrons, ...
-  if ( !(NumiData->GetSimDRays()) &&
+  if ( !isEMSeed && !(NumiData->GetSimDRays()) &&
        ( particleType==G4Gamma::GammaDefinition() ||
          particleType==G4Electron::ElectronDefinition() ||
          particleType==G4Positron::PositronDefinition() ) &&
@@ -79,9 +101,10 @@ G4ClassificationOfNewTrack NumiStackingAction::ClassifyNewTrack(const G4Track * 
 
   //Discard particles with pz<0
   G4ThreeVector momentum=aTrack->GetMomentumDirection();
-  if ( !(NumiData->GetSimDRays()) && momentum[2]<0 && (classification != fKill) )  
+  if ( !isEMSeed && !(NumiData->GetSimDRays()) && momentum[2]<0 && (classification != fKill) )  
   {
      classification = fKill;
+     if (NumiData->createEMSeeds) NumiAnalysis::getInstance()->CountKilledMeson(*aTrack, 1);
   }
 
   //Discard particles with kinetic energy < 1.GeV (that are not neutrinos)
@@ -94,9 +117,10 @@ G4ClassificationOfNewTrack NumiStackingAction::ClassifyNewTrack(const G4Track * 
     {
        G4double energy = aTrack->GetKineticEnergy();
        if (( NumiData->GetKillTracking() && energy < NumiData->GetKillTrackingThreshold() ) &&
-           (classification != fKill))
+           !isEMSeed && (classification != fKill))
        {
           classification = fKill;
+          if (NumiData->createEMSeeds) NumiAnalysis::getInstance()->CountKilledMeson(*aTrack, 0);
        } 
     }
   
@@ -119,8 +143,15 @@ G4ClassificationOfNewTrack NumiStackingAction::ClassifyNewTrack(const G4Track * 
      classification =fKill;
   }
   
+  // e+- seed: record at birth, then kill (photon seeds go on to stepping)
+  if (isEMSeed && (classification != fKill) && particleType!=G4Gamma::GammaDefinition())
+  {
+     NumiAnalysis::getInstance()->FillEMSeedAtCreation(*aTrack);
+     classification = fKill;
+  }
+
   //If importance weighting is on:
-  if (NumiData->NImpWeightOn && (classification != fKill))
+  if (NumiData->NImpWeightOn && !isEMSeed && (classification != fKill))
   {
     NumiTrackInformation* trackInfo=(NumiTrackInformation*)(aTrack->GetUserInformation());  
     if (trackInfo!=0) 
