@@ -109,6 +109,7 @@ public:
    void OutputNuNtuple(G4bool output)           { createNuNtuple=output;}
    void OutputTarNtuple(G4bool output)           { createTarNtuple=output;}
    void OutputTgtExitTree(G4bool output)         { createTgtExitTree=output;}
+   void OutputMesonTree(G4bool output)           { createMesonTree=output;}
    void OutputMesonProvenance(G4bool output)      { createMesonProvenance=output;}
    void OutputEMSeeds(G4bool output)             { createEMSeeds=output;}
    void SetEMSeedMinEnergy(G4double e)           { EMSeedMinEnergy=e;}
@@ -288,6 +289,7 @@ public:
    // fill the "tgtexit" tree in the zpNtuple: mesons crossing the outer
    // surface of the target assembly (see NumiSteppingAction)
    G4bool createTgtExitTree;
+   G4bool createMesonTree;   // legacy zpNtuple `meson` tree (track start); see /NuMI/mesons/* for the stacking tally
    // add ancestry branches to the "meson" tree: creator process, production
    // volume, parent, and the ancestor that carried the energy out of the target
    G4bool createMesonProvenance;

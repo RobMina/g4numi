@@ -357,6 +357,12 @@ NumiRunActionMessenger::NumiRunActionMessenger(NumiRunAction* RA)
   outputTgtExitTree->SetDefaultValue(NumiData->createTgtExitTree);
   outputTgtExitTree->AvailableForStates(G4State_PreInit,G4State_Idle);
 
+  outputMesonTree = new G4UIcmdWithABool("/NuMI/output/outputMesonTree",this);
+  outputMesonTree->SetGuidance("fill the legacy meson tree of the zpNtuple file (mesons at track start, i.e. after the stacking kills; default true). The /NuMI/mesons/ tally records them at stacking instead.");
+  outputMesonTree->SetParameterName("createMesonTree",true);
+  outputMesonTree->SetDefaultValue(NumiData->createMesonTree);
+  outputMesonTree->AvailableForStates(G4State_PreInit,G4State_Idle);
+
   outputMesonProvenance = new G4UIcmdWithABool("/NuMI/output/outputMesonProvenance",this);
   outputMesonProvenance->SetGuidance("add ancestry branches (creator process, volume, parent, target-escape carrier) to the meson tree");
   outputMesonProvenance->SetParameterName("createMesonProvenance",true);
@@ -521,6 +527,7 @@ NumiRunActionMessenger::~NumiRunActionMessenger()
   delete UseMacro;
   delete outputZpNtuple;
   delete outputTgtExitTree;
+  delete outputMesonTree;
   delete outputMesonProvenance;
   delete outputEMSeeds;
   delete EMSeedMinEnergy;
@@ -720,6 +727,9 @@ void NumiRunActionMessenger::SetNewValue(G4UIcommand* command,G4String newValues
   
   if (command==outputTgtExitTree){
     NumiData->OutputTgtExitTree(outputTgtExitTree->GetNewBoolValue(newValues));
+  }
+  if (command==outputMesonTree){
+    NumiData->OutputMesonTree(outputMesonTree->GetNewBoolValue(newValues));
   }
   if (command==outputMesonProvenance){
     NumiData->OutputMesonProvenance(outputMesonProvenance->GetNewBoolValue(newValues));

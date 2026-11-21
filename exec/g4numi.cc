@@ -28,6 +28,7 @@
 #include "NumiTrackingAction.hh"
 #include "NumiRunAction.hh"
 #include "NumiRunManager.hh"
+#include "NumiMesonTally.hh"
 
 #ifdef G4VIS_USE
 #include "NumiVisManager.hh"
@@ -148,6 +149,7 @@ int main(int argc,char** argv)
 
   G4cout << "g4numi: explicitly using '"
              << physListName << "' for physics list" << G4endl;
+  NumiMesonTally::SetPhysicsListName(physListName);  // recorded in the meson tally's meta tree
   physicsList = plFactory.GetReferencePhysList(physListName);
 
   // deal with failure to get what the user wanted

@@ -362,7 +362,7 @@ void NumiAnalysis::book()
       zpmetatree->Branch("n_general_zplanes", &fZpNGeneral, "n_general_zplanes/I");
       zpmetatree->Branch("n_muon_zplanes", &fZpNMuon, "n_muon_zplanes/I");
       
-      if(NumiData->raytracing){
+      if(NumiData->raytracing && NumiData->createMesonTree){
       mesontree = new TTree("meson", "g4numi Generated Mesons");
       mesontree->Branch("px", &meson_px, "px/D");
       mesontree->Branch("py", &meson_py, "py/D");

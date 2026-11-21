@@ -98,6 +98,7 @@ private:
    G4UIcmdWithABool*           UseMacro;
    G4UIcmdWithABool*           outputZpNtuple;
    G4UIcmdWithABool*           outputTgtExitTree;
+   G4UIcmdWithABool*           outputMesonTree;
    G4UIcmdWithABool*           outputMesonProvenance;
    G4UIcmdWithABool*           outputEMSeeds;
    G4UIcmdWithADoubleAndUnit*  EMSeedMinEnergy;

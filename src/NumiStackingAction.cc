@@ -20,6 +20,7 @@
 #include "NumiAnalysis.hh"
 #include "NumiRunManager.hh"
 #include "G4VProcess.hh"
+#include "NumiMesonTally.hh"
 
 #include "CLHEP/Units/PhysicalConstants.h"
 
@@ -45,7 +46,10 @@ NumiStackingAction::~NumiStackingAction()
 
 G4ClassificationOfNewTrack NumiStackingAction::ClassifyNewTrack(const G4Track * aTrack)
 {
-   
+  // LDM meson tally (/NuMI/mesons/*): record before any of the kills below (muon beam, pz<0, kinetic-energy
+  // threshold, out of world, importance-weight roulette). The track still carries its parent's weight here.
+  NumiMesonTally::Instance()->Consider(aTrack);
+
   G4ClassificationOfNewTrack classification = fUrgent;
   G4ParticleDefinition * particleType = aTrack->GetDefinition();
 

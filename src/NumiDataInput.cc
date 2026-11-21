@@ -144,6 +144,7 @@ NumiDataInput::NumiDataInput()
   useFlukaInput = false; useMarsInput=false;
   createTarNtuple=false;
   createTgtExitTree=false;
+  createMesonTree=true;
   createMesonProvenance=false;
   createEMSeeds=false;
   EMSeedMinEnergy=10.0*CLHEP::MeV;

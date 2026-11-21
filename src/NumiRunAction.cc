@@ -6,6 +6,7 @@
 #include "G4UImanager.hh"
 #include "G4VVisManager.hh"
 #include "NumiRunAction.hh"
+#include "NumiMesonTally.hh"
 #include "NumiRunActionMessenger.hh"
 #include "NumiAnalysis.hh"
 #include "NumiTrajectory.hh"
@@ -26,6 +27,7 @@ NumiRunAction::NumiRunAction()
 
    
    runMessenger = new NumiRunActionMessenger(this);
+   NumiMesonTally::Instance(); // registers /NuMI/mesons/ commands before the macro runs
 }
 
 //------------------------------------------------------------------------------
@@ -161,7 +163,8 @@ void NumiRunAction::BeginOfRunAction(const G4Run* aRun)
   G4cout << "********************************************************************" << G4endl;
   G4cout << G4endl;
   G4cout << G4endl;
-  
+
+  NumiMesonTally::Instance()->BeginRun(aRun->GetRunID());
 }
 
 //------------------------------------------------------------------------------
@@ -192,6 +195,7 @@ void NumiRunAction::EndOfRunAction(const G4Run* aRun)
   // We don't care about closing root correctly.. Sometimes, it gets corrupted..Well, study this.. 
   analysis->FillMeta();
   analysis->finish();
+  NumiMesonTally::EndRun(aRun->GetNumberOfEvent());
 
   G4cout << "********************************************************************" << G4endl;
   G4cout << "NumiRunAction::EndOfRunAction - Completed." << G4endl;
