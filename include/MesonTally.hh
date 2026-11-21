@@ -9,7 +9,8 @@
 // list is unbiased whatever the kills do afterwards.
 //
 // Output <stem>_<runID>.mesons.root (run number zero-padded to `runDigits`):
-//   meson : px py pz E [GeV], x y z [cm, global], t [ns], weight, pdg, tgen, evt, trk, ppdg, pE [GeV],
+//   meson : px py pz E [GeV], x y z [cm, global], t [ns], weight, pdg, tgen, evt, trk, ppdg, pE [GeV, parent's
+//           total energy entering the step that made the meson; -1 if unknown],
 //           proc, vol, mat (ids into names). The first 11 match the g4numi `meson` tree.
 //   meta  : pots (events in the run), run, nmeson, physlist, commit
 //   names : id, kind (0 creator process, 1 logical volume, 2 material), name

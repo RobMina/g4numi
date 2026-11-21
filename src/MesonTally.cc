@@ -14,6 +14,8 @@
 #include "G4Navigator.hh"
 #include "G4ParticleDefinition.hh"
 #include "G4RunManager.hh"
+#include "G4Step.hh"
+#include "G4StepPoint.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Track.hh"
 #include "G4TrackingManager.hh"
@@ -177,13 +179,21 @@ void MesonTally::Consider(const G4Track* aTrack)
 
    // Secondaries are stacked right after their parent's tracking ends, while the tracking manager still holds
    // the parent (G4EventManager::DoProcessing deletes it only after StackTracks).
+   // By then the parent's own energy is its post-interaction value (its rest mass if the interaction killed it), so
+   // pE is the parent's total energy at the pre-step point of its last step: the energy entering the step whose
+   // end created this meson (it omits only that step's continuous loss). Mesons made at an earlier step of a
+   // parent that survived its interaction get pE = -1, since that step is no longer available.
    fPPdg = 0;
    fPE = -1.;
    if (aTrack->GetParentID() > 0) {
       const G4Track* parent = G4EventManager::GetEventManager()->GetTrackingManager()->GetTrack();
       if (parent != nullptr && parent->GetTrackID() == aTrack->GetParentID()) {
          fPPdg = parent->GetDefinition()->GetPDGEncoding();
-         fPE = parent->GetTotalEnergy() / GeV;
+         const G4Step* last = parent->GetStep();
+         if (last != nullptr && last->GetPreStepPoint() != nullptr && last->GetPostStepPoint() != nullptr &&
+             (last->GetPostStepPoint()->GetPosition() - aTrack->GetPosition()).mag() < 1.0 * um) {
+            fPE = last->GetPreStepPoint()->GetTotalEnergy() / GeV;
+         }
       }
    }
 
